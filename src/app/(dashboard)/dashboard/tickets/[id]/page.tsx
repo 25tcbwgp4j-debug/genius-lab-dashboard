@@ -15,6 +15,7 @@ import { TicketPaymentsCard } from '@/components/tickets/ticket-payments-card'
 import { TicketShippingCard } from '@/components/tickets/ticket-shipping-card'
 import { TicketTechnicianSelect } from '@/components/tickets/ticket-technician-select'
 import { TicketAcceptanceOperator } from '@/components/tickets/ticket-acceptance-operator'
+import { CommunicationFlagsCard } from '@/components/tickets/communication-flags-card'
 import type { TicketStatus } from '@/types/database'
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
@@ -49,7 +50,7 @@ export default async function TicketDetailPage({
     .select(`
       *,
       customer:customers(id, first_name, last_name, email, phone, preferred_contact_channel),
-      device:devices(id, model, category, serial_number, customer_reported_issue)
+      device:devices(id, model, category, serial_number, customer_reported_issue, device_password, apple_id, apple_id_password, special_notes, passcode_notes, intake_condition)
     `)
     .eq('id', id)
     .single()
@@ -88,6 +89,11 @@ export default async function TicketDetailPage({
     .select('id, amount, payment_method, payment_date, reference, notes')
     .eq('ticket_id', id)
     .order('payment_date', { ascending: false })
+
+  const { data: commFlags } = await supabase
+    .from('communication_flags')
+    .select('id, flag_type, sent_at')
+    .eq('ticket_id', id)
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const trackingLink = `${baseUrl}/track/${ticket.public_tracking_token}`
@@ -159,6 +165,7 @@ export default async function TicketDetailPage({
           estimateLaborCost={Number(ticket.estimate_labor_cost ?? 0)}
           estimatePartsCost={Number(ticket.estimate_parts_cost ?? 0)}
           estimateNotes={(ticket as { estimate_notes?: string | null }).estimate_notes ?? null}
+          estimateItems={(ticket as { estimate_items?: { description: string; amount: number; list_price?: number | null }[] | null }).estimate_items ?? null}
           totalAmount={Number(ticket.total_amount ?? 0)}
           status={ticket.status as TicketStatus}
           canEdit={canChangeStatus}
@@ -223,17 +230,68 @@ export default async function TicketDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Diagnosi e note</CardTitle>
-          <CardDescription>Intake e diagnosi tecnica (solo il tecnico modifica la diagnosi)</CardDescription>
+          <CardTitle>Riepilogo riparazione</CardTitle>
+          <CardDescription>Dettaglio completo intake, diagnosi e dati dispositivo</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <p><span className="text-muted-foreground">Sintesi intake:</span> {ticket.intake_summary ?? '—'}</p>
-          <p><span className="text-muted-foreground">Diagnosi:</span> {ticket.diagnosis ?? '—'}</p>
-          {ticket.status === 'refused' && (ticket as { refused_note?: string | null }).refused_note && (
-            <p className="pt-2 border-t"><span className="text-muted-foreground">Note rifiuto cliente:</span> {(ticket as { refused_note: string }).refused_note}</p>
-          )}
+        <CardContent>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">Difetto segnalato</dt>
+            <dd>{(ticket.device as { customer_reported_issue?: string })?.customer_reported_issue ?? '—'}</dd>
+
+            <dt className="text-muted-foreground">Dispositivo</dt>
+            <dd>{ticket.device ? `${(ticket.device as { model: string }).model} (${(ticket.device as { category: string }).category})` : '—'}</dd>
+
+            <dt className="text-muted-foreground">Operatore accettazione</dt>
+            <dd>{(ticket as { acceptance_operator?: string | null }).acceptance_operator ?? '—'}</dd>
+
+            <dt className="text-muted-foreground">Sintesi intake</dt>
+            <dd className="whitespace-pre-line">{ticket.intake_summary ?? '—'}</dd>
+
+            <dt className="text-muted-foreground">Condizione ingresso</dt>
+            <dd>{(ticket.device as { intake_condition?: string })?.intake_condition ?? '—'}</dd>
+
+            <dt className="text-muted-foreground">Password dispositivo</dt>
+            <dd>{(ticket.device as { device_password?: string })?.device_password ?? '—'}</dd>
+
+            <dt className="text-muted-foreground">Apple ID</dt>
+            <dd>{(ticket.device as { apple_id?: string })?.apple_id ?? '—'}</dd>
+
+            <dt className="text-muted-foreground">Password Apple ID</dt>
+            <dd>{(ticket.device as { apple_id_password?: string })?.apple_id_password ?? '—'}</dd>
+
+            <dt className="text-muted-foreground">Garanzia 1° anno</dt>
+            <dd>{(ticket as { warranty_first_year?: boolean | null }).warranty_first_year ? 'Sì' : 'No'}</dd>
+
+            <dt className="text-muted-foreground">Garanzia 2° anno</dt>
+            <dd>{(ticket as { warranty_second_year?: boolean | null }).warranty_second_year ? 'Sì' : 'No'}</dd>
+
+            <dt className="text-muted-foreground">Spedizione</dt>
+            <dd>{(ticket as { shipping_type?: string | null }).shipping_type ?? (ticket.shipping_required ? 'Corriere' : 'A mano')}</dd>
+
+            <dt className="text-muted-foreground">Diagnosi tecnico</dt>
+            <dd className="whitespace-pre-line">{ticket.diagnosis ?? '—'}</dd>
+
+            {(ticket.device as { special_notes?: string })?.special_notes && (
+              <>
+                <dt className="text-muted-foreground">Note speciali</dt>
+                <dd className="whitespace-pre-line">{(ticket.device as { special_notes: string }).special_notes}</dd>
+              </>
+            )}
+
+            {ticket.status === 'refused' && (ticket as { refused_note?: string | null }).refused_note && (
+              <>
+                <dt className="text-muted-foreground text-destructive">Note rifiuto</dt>
+                <dd className="text-destructive">{(ticket as { refused_note: string }).refused_note}</dd>
+              </>
+            )}
+          </dl>
         </CardContent>
       </Card>
+
+      <CommunicationFlagsCard
+        ticketId={id}
+        flags={(commFlags ?? []).map(f => ({ id: f.id, flag_type: f.flag_type, sent_at: f.sent_at }))}
+      />
 
       <Card>
         <CardHeader>

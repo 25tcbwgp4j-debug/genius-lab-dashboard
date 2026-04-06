@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Ticket } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { DeleteDeviceButton } from '@/components/devices/delete-device-button'
 
 export default async function DeviceDetailPage({
   params,
@@ -99,6 +100,8 @@ export default async function DeviceDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <DeleteDeviceButton deviceId={device.id} />
     </div>
   )
 }
