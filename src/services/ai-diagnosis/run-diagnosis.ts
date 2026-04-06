@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { IAIDiagnosisProvider, AIDiagnosisResult } from '@/lib/ai/provider'
 import { OpenAIDiagnosisAdapter } from '@/lib/ai/openai-adapter'
+import { AnthropicDiagnosisAdapter } from '@/lib/ai/anthropic-adapter'
 import { logAIDiagnosis } from './logger'
 
 const AI_DIAGNOSIS_MAX_ATTEMPTS = 3
@@ -11,11 +12,12 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** Provider factory: AI_DIAGNOSIS_PROVIDER=openai (default) or future adapters. */
+/** Provider factory: AI_DIAGNOSIS_PROVIDER=anthropic (default) or openai. */
 function getProvider(): IAIDiagnosisProvider {
-  const provider = process.env.AI_DIAGNOSIS_PROVIDER ?? 'openai'
+  const provider = process.env.AI_DIAGNOSIS_PROVIDER ?? 'anthropic'
+  if (provider === 'anthropic') return new AnthropicDiagnosisAdapter()
   if (provider === 'openai') return new OpenAIDiagnosisAdapter()
-  throw new Error(`AI_DIAGNOSIS_PROVIDER=${provider} non supportato. Usare "openai".`)
+  throw new Error(`AI_DIAGNOSIS_PROVIDER=${provider} non supportato. Usare "anthropic" o "openai".`)
 }
 
 export type RunAIDiagnosisErrorCode = 'ticket_not_found' | 'device_not_found' | 'provider_error' | 'validation_error' | 'storage_error'

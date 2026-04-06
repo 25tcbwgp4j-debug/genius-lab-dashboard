@@ -95,6 +95,12 @@ export default async function TicketDetailPage({
     .select('id, flag_type, sent_at')
     .eq('ticket_id', id)
 
+  const { data: operatorsList } = await supabase
+    .from('operators')
+    .select('name')
+    .eq('active', true)
+    .order('name')
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const trackingLink = `${baseUrl}/track/${ticket.public_tracking_token}`
   const estimateLink = `${baseUrl}/estimate/${ticket.public_tracking_token}`
@@ -134,6 +140,7 @@ export default async function TicketDetailPage({
         <TicketAcceptanceOperator
           ticketId={id}
           currentOperator={(ticket as { acceptance_operator?: string | null }).acceptance_operator ?? null}
+          operators={(operatorsList ?? []).map(o => o.name)}
         />
       </div>
 

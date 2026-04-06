@@ -4,11 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { buttonVariants } from '@/components/ui/button'
 import { requireRole } from '@/lib/auth/require-role'
 import { canAccessSettings } from '@/lib/auth/rbac'
+import { OperatorsManager } from '@/components/settings/operators-manager'
 
 export default async function SettingsPage() {
   await requireRole(canAccessSettings)
   const supabase = await createClient()
   const { data: settings } = await supabase.from('company_settings').select('*').limit(1).maybeSingle()
+  const { data: operators } = await supabase.from('operators').select('id, name, active').order('name')
 
   return (
     <div className="space-y-6">
@@ -35,6 +37,15 @@ export default async function SettingsPage() {
           ) : (
             <p className="text-muted-foreground">Nessuna impostazione. Esegui il seed del database.</p>
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Operatori</CardTitle>
+          <CardDescription>Gestisci i nomi degli operatori per accettazione e tecnico assegnato</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OperatorsManager operators={(operators ?? []).map(o => ({ id: o.id, name: o.name, active: o.active }))} />
         </CardContent>
       </Card>
       <Card>

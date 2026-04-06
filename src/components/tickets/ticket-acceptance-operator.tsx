@@ -12,14 +12,14 @@ import {
 } from '@/components/ui/select'
 import { updateAcceptanceOperatorAction } from '@/app/actions/tickets'
 
-const OPERATORI = ['CHRISTIAN', 'VALENTINA', 'ROBERTO', 'ALEX', 'MARCO', 'DUMY', 'FRANCESCA']
-
 export function TicketAcceptanceOperator({
   ticketId,
   currentOperator,
+  operators,
 }: {
   ticketId: string
   currentOperator: string | null
+  operators: string[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -45,7 +45,7 @@ export function TicketAcceptanceOperator({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__">Nessuno</SelectItem>
-          {OPERATORI.map((nome) => (
+          {operators.map((nome) => (
             <SelectItem key={nome} value={nome}>
               {nome}
             </SelectItem>
