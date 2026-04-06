@@ -1,36 +1,118 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Genius Lab — Piattaforma gestione riparazioni
 
-## Getting Started
+Piattaforma operativa per centro assistenza Apple: gestione clienti, dispositivi, ticket di riparazione, preventivi, pagamenti, magazzino e comunicazioni (email/WhatsApp).
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Next.js** (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **Supabase**: PostgreSQL, Auth, Storage, Realtime
+- **Resend**: email transazionali
+- **WhatsApp**: architettura a adapter (integrabile con API Business)
+- **Vercel**: deployment
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Requisiti
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node.js 18+
+- Account Supabase
+- (Opzionale) Resend, OpenAI per AI diagnosis
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup locale
 
-## Learn More
+1. **Clona e installa**
+   ```bash
+   cd genius-lab
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. **Variabili d’ambiente**
+   Copia `env.example` in `.env.local` e compila:
+   ```bash
+   cp env.example .env.local
+   ```
+   - `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` dal progetto Supabase
+   - `SUPABASE_SERVICE_ROLE_KEY` per operazioni server-side (es. seed)
+   - `NEXT_PUBLIC_APP_URL`: es. `http://localhost:3000`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Database**
+   - Crea un progetto su [Supabase](https://supabase.com)
+   - Esegui le migrazioni in `supabase/migrations/` (SQL Editor o Supabase CLI)
+   - Esegui `supabase/seed.sql` per impostazioni azienda e template messaggi
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. **Primo utente**
+   - Iscriviti dalla app (route `/login` o pagina pubblica poi login)
+   - In Supabase Dashboard → Table Editor → `profiles`: imposta `role = 'admin'` per il tuo utente
 
-## Deploy on Vercel
+5. **Avvio**
+   ```bash
+   npm run dev
+   ```
+   Apri `http://localhost:3000`. Accedi e vai alla dashboard.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Script
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — sviluppo
+- `npm run build` — build produzione
+- `npm run start` — avvio dopo build
+- `npm run lint` — lint
+
+## Struttura principale
+
+- `app/` — route Next.js (pubbliche, auth, dashboard)
+- `components/` — UI, form, tabelle, ticket, clienti
+- `lib/` — Supabase client, auth, validazioni
+- `services/` — ticket numbering, (futuro: comunicazioni, AI)
+- `app/actions/` — server actions (clienti, ticket, stime)
+- `supabase/migrations/` — schema PostgreSQL
+- `docs/ARCHITECTURE.md` — architettura e piano implementazione
+
+## Ruoli
+
+- **admin**: accesso completo
+- **manager**: ticket, analytics, magazzino, comunicazioni, pagamenti
+- **reception**: intake, clienti, creazione ticket, pagamenti, spedizioni
+- **technician**: diagnosi, note riparazione, parti, stati, test
+
+## Verifica e messa in esercizio
+
+Per una **verifica generale** di tutte le funzionalità (intake PDF, diagnosi AI, preventivo, WhatsApp) e le istruzioni per **metterle in esercizio e testarle**, vedi **[docs/VERIFICA-E-MESSA-IN-ESERCIZIO.md](docs/VERIFICA-E-MESSA-IN-ESERCIZIO.md)**.
+
+## Deploy (Vercel)
+
+1. Collega il repo a Vercel
+2. Imposta le stesse variabili d’ambiente (incl. `NEXT_PUBLIC_APP_URL` con dominio reale)
+3. Deploy: Vercel usa `next build` e `next start`
+
+## Checklist funzionalità
+
+- [x] Auth (login, sessioni, profili con ruolo)
+- [x] CRM clienti (CRUD, ricerca, canale preferito)
+- [x] Dispositivi (legati a cliente, storico ticket)
+- [x] Ticket riparazione (numero GL-YYYY-NNNNNN, token tracking, stati)
+- [x] Workflow stati e eventi (ticket_events)
+- [x] Pagina pubblica tracking `/track/[token]`
+- [x] Pagina approvazione/rifiuto preventivo `/estimate/[token]`
+- [x] Dashboard (conteggi, scorte basse, azioni rapide)
+- [x] Magazzino (elenco parti, soglie)
+- [x] Pagamenti (elenco)
+- [x] Comunicazioni (log)
+- [x] Impostazioni (lettura dati azienda)
+- [ ] AI diagnosis (strato servizio e UI “Genera suggerimento”)
+- [ ] Generazione PDF (scheda assistenza, preventivo, istruzioni pagamento)
+- [ ] Invio email (Resend) e WhatsApp (adapter) su eventi
+- [ ] Registrazione pagamento da UI ticket
+- [ ] Assegnazione parti a ticket e movimenti magazzino
+- [ ] Modifica impostazioni azienda da UI admin
+
+## Estensioni future
+
+- Invio automatico scheda assistenza (email + WhatsApp) alla creazione ticket
+- Notifiche su cambio stato (in riparazione, pronto ritiro, ecc.)
+- Template messaggi modificabili da UI
+- Report e analytics (ricavi, conversioni preventivi)
+- Multi-tenant (più negozi)
+- Coda job per PDF e notifiche (es. Inngest)
+- App mobile o PWA per tecnici
+
+## Licenza
+
+Uso interno / come da accordi.
