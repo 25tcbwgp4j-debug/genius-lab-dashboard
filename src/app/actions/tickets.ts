@@ -11,6 +11,28 @@ import { canCreateTicket, canChangeTicketStatus, canEditTicketShipping, canAssig
 import { isAllowedTransition } from '@/lib/ticket-workflow'
 import type { TicketStatus } from '@/types/database'
 
+// Mappa evento notifica → flag comunicazione
+const NOTIFICATION_TO_FLAG: Record<string, string> = {
+  intake_created: 'intake_sent',
+  estimate_ready: 'estimate_sent',
+  repair_update: 'update_sent',
+  ready_for_pickup: 'ready_sent',
+  ready_for_shipping: 'ready_sent',
+  payment_instructions: 'payment_sent',
+}
+
+// Setta automaticamente il flag comunicazione quando una notifica viene inviata con successo
+async function autoSetCommunicationFlag(ticketId: string, event: string, userId: string) {
+  const flagType = NOTIFICATION_TO_FLAG[event]
+  if (!flagType) return
+  const supabase = await createClient()
+  // Upsert: se il flag esiste già non lo duplica (UNIQUE constraint)
+  await supabase.from('communication_flags').upsert(
+    { ticket_id: ticketId, flag_type: flagType, sent_by: userId, sent_at: new Date().toISOString() },
+    { onConflict: 'ticket_id,flag_type' }
+  )
+}
+
 export async function createTicket(payload: {
   customer_id: string
   device_id: string
@@ -59,6 +81,8 @@ export async function createTicket(payload: {
       user_id: user.id,
       metadata: { event: notifResult.event, template_key: notifResult.templateKey, channels },
     })
+    // Auto-flag: segna scheda ingresso come inviata
+    await autoSetCommunicationFlag(ticket.id, notifResult.event, user.id)
   }
 
   revalidatePath('/dashboard/tickets')
@@ -122,8 +146,14 @@ export async function updateTicketStatus(
   const { data: ticketFull } = await supabase.from('tickets').select('total_amount, amount_paid').eq('id', ticketId).single()
   const amountDue = ticketFull ? Number(ticketFull.total_amount) - Number(ticketFull.amount_paid) : 0
 
+  // Raccoglie errori di notifica per informare l'utente
+  const notificationErrors: string[] = []
+
   const recordNotificationSent = async (res: Awaited<ReturnType<typeof dispatchNotification>>) => {
-    if (!res.ok) return
+    if (!res.ok) {
+      notificationErrors.push(`Notifica ${res.event} non inviata: ${res.errors.join(', ') || 'errore sconosciuto'}`)
+      return
+    }
     const channels = [res.emailSent && 'email', res.whatsappSent && 'whatsapp'].filter(Boolean) as string[]
     await supabase.from('ticket_events').insert({
       ticket_id: ticketId,
@@ -131,6 +161,8 @@ export async function updateTicketStatus(
       user_id: user.id,
       metadata: { event: res.event, template_key: res.templateKey, channels },
     })
+    // Auto-flag: segna automaticamente la comunicazione come inviata
+    await autoSetCommunicationFlag(ticketId, res.event, user.id)
   }
 
   if (newStatus === 'estimate_ready') {
@@ -177,7 +209,7 @@ export async function updateTicketStatus(
   revalidatePath(`/dashboard/tickets/${ticketId}`)
   revalidatePath('/dashboard/tickets')
   revalidatePath('/dashboard')
-  return { success: true }
+  return { success: true, notificationErrors }
 }
 
 export async function updateTicketShipping(
@@ -230,7 +262,7 @@ export async function assignTechnicianAction(ticketId: string, assignedTechnicia
 }
 
 export async function updateAcceptanceOperatorAction(ticketId: string, operator: string | null) {
-  const { user } = await requireUserAndProfile()
+  await requireUserAndProfile()
   const supabase = await createClient()
   const { error } = await supabase
     .from('tickets')

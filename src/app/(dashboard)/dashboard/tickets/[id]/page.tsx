@@ -56,50 +56,31 @@ export default async function TicketDetailPage({
     .single()
   if (!ticket) notFound()
 
-  const { data: events } = await supabase
-    .from('ticket_events')
-    .select('*')
-    .eq('ticket_id', id)
-    .order('created_at', { ascending: false })
-    .limit(20)
+  // Query parallele per performance (erano 8 query seriali)
+  const [
+    { data: events },
+    { data: aiDiagnoses },
+    user,
+    { data: technicians },
+    { data: ticketPayments },
+    { data: commFlags },
+    { data: operatorsList },
+  ] = await Promise.all([
+    supabase.from('ticket_events').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(20),
+    supabase.from('ticket_ai_diagnosis').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(1),
+    supabase.auth.getUser(),
+    supabase.from('profiles').select('id, display_name').eq('role', 'technician').order('display_name', { ascending: true, nullsFirst: false }),
+    supabase.from('payments').select('id, amount, payment_method, payment_date, reference, notes').eq('ticket_id', id).order('payment_date', { ascending: false }),
+    supabase.from('communication_flags').select('id, flag_type, sent_at').eq('ticket_id', id),
+    supabase.from('operators').select('name').eq('active', true).order('name'),
+  ])
 
-  const { data: aiDiagnoses } = await supabase
-    .from('ticket_ai_diagnosis')
-    .select('*')
-    .eq('ticket_id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
   const latestAIDiagnosis = aiDiagnoses?.[0] ?? null
-
-  const user = await supabase.auth.getUser()
   const profile = user.data.user ? await getProfile(user.data.user.id) : null
   const canUseAI = profile ? canUseAIDiagnosis(profile.role) : false
   const canRecordPay = profile ? canRecordPayment(profile.role) : false
   const canAssignTech = profile ? canAssignTechnician(profile.role) : false
   const canChangeStatus = profile ? canChangeTicketStatus(profile.role) : false
-
-  const { data: technicians } = await supabase
-    .from('profiles')
-    .select('id, display_name')
-    .eq('role', 'technician')
-    .order('display_name', { ascending: true, nullsFirst: false })
-
-  const { data: ticketPayments } = await supabase
-    .from('payments')
-    .select('id, amount, payment_method, payment_date, reference, notes')
-    .eq('ticket_id', id)
-    .order('payment_date', { ascending: false })
-
-  const { data: commFlags } = await supabase
-    .from('communication_flags')
-    .select('id, flag_type, sent_at')
-    .eq('ticket_id', id)
-
-  const { data: operatorsList } = await supabase
-    .from('operators')
-    .select('name')
-    .eq('active', true)
-    .order('name')
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const trackingLink = `${baseUrl}/track/${ticket.public_tracking_token}`

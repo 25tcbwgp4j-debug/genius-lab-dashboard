@@ -9,30 +9,19 @@ import { cn } from '@/lib/utils'
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  const [
-    { count: openTickets },
-    { count: waitingApproval },
-    { count: waitingParts },
-    { count: inRepair },
-    { count: readyPickup },
-    { count: todayTickets },
-    lowStockParts,
-  ] = await Promise.all([
-    supabase.from('tickets').select('*', { count: 'exact', head: true }).in('status', ['new', 'intake_completed', 'in_diagnosis', 'estimate_ready', 'waiting_customer_approval', 'approved', 'waiting_parts', 'in_repair', 'testing', 'ready_for_pickup', 'ready_for_shipping', 'shipped']),
-    supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'waiting_customer_approval'),
-    supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'waiting_parts'),
-    supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'in_repair'),
-    supabase.from('tickets').select('*', { count: 'exact', head: true }).in('status', ['ready_for_pickup', 'ready_for_shipping']),
-    supabase.from('tickets').select('*', { count: 'exact', head: true }).gte('created_at', new Date().toISOString().slice(0, 10)),
+  // 1 query RPC invece di 7 query separate per i contatori
+  const [{ data: counts }, lowStockParts] = await Promise.all([
+    supabase.rpc('get_dashboard_counts'),
     getLowStockParts(),
   ])
 
-  const openCount = openTickets ?? 0
-  const approvalCount = waitingApproval ?? 0
-  const partsCount = waitingParts ?? 0
-  const repairCount = inRepair ?? 0
-  const pickupCount = readyPickup ?? 0
-  const todayCount = todayTickets ?? 0
+  const c = (counts ?? {}) as Record<string, number>
+  const openCount = c.open ?? 0
+  const approvalCount = c.waiting_approval ?? 0
+  const partsCount = c.waiting_parts ?? 0
+  const repairCount = c.in_repair ?? 0
+  const pickupCount = c.ready ?? 0
+  const todayCount = c.today ?? 0
   const lowStock = lowStockParts.length
 
   return (

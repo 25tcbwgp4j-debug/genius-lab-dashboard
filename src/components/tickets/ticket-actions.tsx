@@ -30,7 +30,18 @@ export function TicketActions({ ticketId, currentStatus }: { ticketId: string; c
   const [shippedDialogOpen, setShippedDialogOpen] = useState(false)
   const [courierName, setCourierName] = useState('')
   const [trackingCode, setTrackingCode] = useState('')
+  const [warning, setWarning] = useState<string | null>(null)
   const nextOptions = getAllowedNextStatuses(currentStatus)
+
+  async function handleResult(result: { success?: boolean; error?: string; notificationErrors?: string[] }) {
+    if (result.error) {
+      setWarning(`Errore: ${result.error}`)
+    } else if (result.notificationErrors?.length) {
+      setWarning(`Stato aggiornato, ma: ${result.notificationErrors.join('; ')}`)
+    } else {
+      setWarning(null)
+    }
+  }
 
   function handleStatusChange(newStatus: string | null) {
     if (!newStatus) return
@@ -41,14 +52,16 @@ export function TicketActions({ ticketId, currentStatus }: { ticketId: string; c
       return
     }
     startTransition(async () => {
-      await updateTicketStatus(ticketId, newStatus)
+      const result = await updateTicketStatus(ticketId, newStatus)
+      await handleResult(result)
       router.refresh()
     })
   }
 
   function handleShippedSubmit() {
     startTransition(async () => {
-      await updateTicketStatus(ticketId, 'shipped', { courier_name: courierName, tracking_code: trackingCode })
+      const result = await updateTicketStatus(ticketId, 'shipped', { courier_name: courierName, tracking_code: trackingCode })
+      await handleResult(result)
       setShippedDialogOpen(false)
       router.refresh()
     })
@@ -58,6 +71,12 @@ export function TicketActions({ ticketId, currentStatus }: { ticketId: string; c
 
   return (
     <>
+      {warning && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+          {warning}
+          <button type="button" onClick={() => setWarning(null)} className="ml-2 font-medium underline">Chiudi</button>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground">Cambia stato:</span>
         <Select onValueChange={handleStatusChange} disabled={isPending}>
