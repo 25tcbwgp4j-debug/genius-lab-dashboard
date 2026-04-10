@@ -1,78 +1,72 @@
-'use client'
+import { login } from "./actions";
+import { LogIn } from "lucide-react";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+interface LoginPageProps {
+  searchParams: Promise<{ error?: string; from?: string }>;
+}
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
+function errorMessage(code?: string): string | null {
+  if (!code) return null;
+  if (code === "invalid") return "Password non valida. Riprova.";
+  if (code === "not_configured")
+    return "Autenticazione non configurata sul server. Contattare l'amministratore.";
+  return "Errore di autenticazione.";
+}
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-    const supabase = createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-    setLoading(false)
-    if (signInError) {
-      setError(signInError.message)
-      return
-    }
-    router.push('/dashboard')
-    router.refresh()
-  }
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const error = errorMessage(params.error);
+  const from = params.from || "/dashboard";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Genius Lab</CardTitle>
-        <CardDescription>Accedi al gestionale</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="tu@geniuslab.it"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Accesso in corso...' : 'Accedi'}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          <Link href="/" className="underline hover:text-foreground">Torna alla home</Link>
+    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div className="flex flex-col items-center mb-6">
+        <div className="bg-blue-100 p-3 rounded-full mb-3">
+          <LogIn className="w-7 h-7 text-blue-600" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Genius Lab</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Gestionale Centro Assistenza Apple Roma
         </p>
-      </CardContent>
-    </Card>
-  )
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
+      <form action={login} className="space-y-4">
+        <input type="hidden" name="from" value={from} />
+        <div>
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Password
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autoFocus
+            autoComplete="current-password"
+            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Inserisci la password"
+          />
+        </div>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-medium transition-colors"
+        >
+          Accedi
+        </button>
+      </form>
+
+      <p className="text-xs text-gray-400 text-center mt-6">
+        Accesso riservato allo staff. La sessione scade dopo 30 giorni.
+      </p>
+    </div>
+  );
 }

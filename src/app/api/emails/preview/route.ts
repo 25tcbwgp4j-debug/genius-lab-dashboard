@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/auth/session'
-import { getProfile } from '@/lib/auth/profile'
-import { canAccessSettings } from '@/lib/auth/rbac'
+import { cookies } from 'next/headers'
+import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth-password'
 import { renderEmailToHtmlAndText } from '@/services/communications/email/render-email'
 import type { TemplateKey } from '@/services/communications/template-resolver'
+
+// Auth password-based: check cookie HMAC invece di Supabase Auth
+async function isAuthenticated(): Promise<boolean> {
+  const secret = process.env.AUTH_SECRET || ''
+  if (!secret) return false
+  const cookieStore = await cookies()
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value
+  if (!token) return false
+  return verifyToken(token, secret)
+}
 
 const SAMPLE_PAYLOAD: Record<string, string> = {
   customer_name: 'Mario Rossi',
@@ -38,11 +47,8 @@ export async function GET(request: Request) {
   if (!templateKey || !TEMPLATE_KEYS.includes(templateKey)) {
     return NextResponse.json({ error: 'templateKey required and must be one of: ' + TEMPLATE_KEYS.join(', ') }, { status: 400 })
   }
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const profile = await getProfile(user.id)
-  if (!profile || !canAccessSettings(profile.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const payload = { ...SAMPLE_PAYLOAD }
   try {
@@ -56,11 +62,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const profile = await getProfile(user.id)
-  if (!profile || !canAccessSettings(profile.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   let body: { templateKey?: string; payload?: Record<string, string> }
   try {

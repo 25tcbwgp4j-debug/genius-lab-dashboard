@@ -1,10 +1,11 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { logout as passwordLogout } from '@/app/(auth)/login/actions'
 
+/**
+ * signOut: wrapper retrocompatibile che usa il nuovo sistema auth password-based.
+ * Mantenuto per non rompere i componenti che importano { signOut } from questo modulo.
+ */
 export async function signOut() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  redirect('/')
+  await passwordLogout()
 }

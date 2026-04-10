@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft } from 'lucide-react'
 import { TicketActions } from '@/components/tickets/ticket-actions'
 import { AIDiagnosisBlock } from '@/components/tickets/ai-diagnosis-block'
-import { getProfile } from '@/lib/auth/profile'
-import { canUseAIDiagnosis, canRecordPayment, canAssignTechnician, canChangeTicketStatus } from '@/lib/auth/rbac'
+// Rimosso getProfile e rbac: staff ha sempre accesso completo (auth password-based)
 import { EstimateCard } from '@/components/tickets/estimate-card'
 import { TicketPaymentsCard } from '@/components/tickets/ticket-payments-card'
 import { TicketShippingCard } from '@/components/tickets/ticket-shipping-card'
@@ -17,6 +16,9 @@ import { TicketTechnicianSelect } from '@/components/tickets/ticket-technician-s
 import { TicketAcceptanceOperator } from '@/components/tickets/ticket-acceptance-operator'
 import { CommunicationFlagsCard } from '@/components/tickets/communication-flags-card'
 import type { TicketStatus } from '@/types/database'
+
+// Auth password-based: niente RBAC, staff ha accesso completo (ruolo admin implicito).
+// Tutte le capability sono sempre vere.
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   new: 'Nuovo',
@@ -56,11 +58,10 @@ export default async function TicketDetailPage({
     .single()
   if (!ticket) notFound()
 
-  // Query parallele per performance (erano 8 query seriali)
+  // Query parallele per performance (erano 8 query seriali, ora 6 senza auth)
   const [
     { data: events },
     { data: aiDiagnoses },
-    user,
     { data: technicians },
     { data: ticketPayments },
     { data: commFlags },
@@ -68,7 +69,6 @@ export default async function TicketDetailPage({
   ] = await Promise.all([
     supabase.from('ticket_events').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(20),
     supabase.from('ticket_ai_diagnosis').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(1),
-    supabase.auth.getUser(),
     supabase.from('profiles').select('id, display_name').eq('role', 'technician').order('display_name', { ascending: true, nullsFirst: false }),
     supabase.from('payments').select('id, amount, payment_method, payment_date, reference, notes').eq('ticket_id', id).order('payment_date', { ascending: false }),
     supabase.from('communication_flags').select('id, flag_type, sent_at').eq('ticket_id', id),
@@ -76,11 +76,11 @@ export default async function TicketDetailPage({
   ])
 
   const latestAIDiagnosis = aiDiagnoses?.[0] ?? null
-  const profile = user.data.user ? await getProfile(user.data.user.id) : null
-  const canUseAI = profile ? canUseAIDiagnosis(profile.role) : false
-  const canRecordPay = profile ? canRecordPayment(profile.role) : false
-  const canAssignTech = profile ? canAssignTechnician(profile.role) : false
-  const canChangeStatus = profile ? canChangeTicketStatus(profile.role) : false
+  // Staff ha sempre accesso completo (auth password-based, ruolo admin implicito)
+  const canUseAI = true
+  const canRecordPay = true
+  const canAssignTech = true
+  const canChangeStatus = true
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const trackingLink = `${baseUrl}/track/${ticket.public_tracking_token}`
