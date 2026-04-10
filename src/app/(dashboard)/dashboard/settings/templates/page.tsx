@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import { buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { ArrowLeft } from 'lucide-react'
 import { TemplateList } from '@/components/settings/template-list'
 import type { TemplateKey } from '@/services/communications/template-resolver'

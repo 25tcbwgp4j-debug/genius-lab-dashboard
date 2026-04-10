@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { requireRole } from '@/lib/auth/require-role'
 import { canAccessSettings } from '@/lib/auth/rbac'
 import { OperatorsManager } from '@/components/settings/operators-manager'
