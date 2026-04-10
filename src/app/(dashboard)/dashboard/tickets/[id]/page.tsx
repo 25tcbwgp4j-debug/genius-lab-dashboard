@@ -5,7 +5,7 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Tag, FileDown } from 'lucide-react'
 import { TicketActions } from '@/components/tickets/ticket-actions'
 import { AIDiagnosisBlock } from '@/components/tickets/ai-diagnosis-block'
 // Rimosso getProfile e rbac: staff ha sempre accesso completo (auth password-based)
@@ -101,9 +101,27 @@ export default async function TicketDetailPage({
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="secondary">{ticket.priority}</Badge>
           <Badge>{ticket.payment_status}</Badge>
+          <a
+            href={`/api/tickets/${id}/label`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-100 transition-colors"
+            title="Genera PDF etichetta 50x30mm per il ticket"
+          >
+            <Tag className="h-4 w-4" />
+            Etichetta
+          </a>
+          <a
+            href={`/api/tickets/${id}/fattura-xml`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+            title="Scarica XML FatturaPA da importare in SimplyFatt"
+          >
+            <FileDown className="h-4 w-4" />
+            Fattura XML
+          </a>
         </div>
       </div>
 
