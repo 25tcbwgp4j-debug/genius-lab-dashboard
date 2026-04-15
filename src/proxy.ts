@@ -29,6 +29,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Vercel Cron: rotte protette internamente da Bearer CRON_SECRET
+  if (pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
+
   const secret = process.env.AUTH_SECRET || "";
 
   // Se l'auth non e' configurata sul deploy, blocca tutto per sicurezza
