@@ -1,17 +1,14 @@
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib'
 
 /**
- * Genera etichette 50x30mm per riparazioni.
- * Una etichetta per pagina PDF. Formato compatibile con stampanti termiche
- * a rotolo continuo (es. Brother QL-700 + DK-22223 50mm).
- *
- * Contenuto etichetta:
- *   - GENIUS LAB SRLS (brand)
- *   - Numero riparazione (ticket_number)
- *   - Nome cliente
- *   - Modello dispositivo
- *   - Data intake
- *   - Telefono cliente (fallback dal contatto)
+ * Etichette riparazione 50x22mm (Brother QL-700 + DK-22223).
+ * Layout allineato al sistema Tarature (backend labels_generator.py):
+ *   GENIUS LAB s.r.l.s
+ *   V.le Somalia 246 Roma  06 80074880  375 7371888
+ *   ─────────────────────────────
+ *   RIP. GL-XXX · CATEGORIA
+ *   Nome cliente · Tel. XXX
+ *   Modello               Intake: gg/mm/aa
  */
 
 export interface LabelInput {
@@ -21,14 +18,21 @@ export interface LabelInput {
   deviceCategory?: string | null
   intakeDate: string
   customerPhone?: string | null
-  companyName?: string
 }
 
-// 50mm x 30mm in punti PDF (1 mm = 2.83464567 pt)
+// 1 mm = 2.83464567 pt
 const MM = 2.83464567
-const PAGE_W = 50 * MM
-const PAGE_H = 30 * MM
-const MARGIN = 1.5 * MM
+const LABEL_W_MM = 50.0
+const LABEL_H_MM = 22.0
+const MARGIN_MM = 2.2
+const MARGIN_TOP_MM = 3.5
+
+const PAGE_W = LABEL_W_MM * MM
+const PAGE_H = LABEL_H_MM * MM
+
+const COMPANY_BOLD = 'GENIUS LAB'
+const COMPANY_SUFFIX = 's.r.l.s'
+const CONTACT_LINE = 'V.le Somalia 246 Roma  06 80074880  375 7371888'
 
 function truncate(text: string, maxChars: number): string {
   if (!text) return ''
@@ -44,91 +48,106 @@ function drawLabel(
 ) {
   const dark = rgb(0.1, 0.1, 0.1)
   const gray = rgb(0.45, 0.45, 0.45)
-  const innerW = PAGE_W - MARGIN * 2
-  let y = PAGE_H - MARGIN
+  const left = MARGIN_MM * MM
+  const right = PAGE_W - MARGIN_MM * MM
+  const topMargin = MARGIN_TOP_MM * MM
 
-  // 1. Brand centrato (GENIUS LAB SRLS)
-  const brand = data.companyName || 'GENIUS LAB SRLS'
-  const brandSize = 8.5
-  const brandWidth = bold.widthOfTextAtSize(brand, brandSize)
-  page.drawText(brand, {
-    x: MARGIN + (innerW - brandWidth) / 2,
-    y: y - brandSize,
-    size: brandSize,
+  // === Riga 1: GENIUS LAB (bold) + s.r.l.s (small), centrato ===
+  const boldSize = 8.5
+  const suffixSize = 6
+  const titleY = PAGE_H - topMargin - 1.8 * MM
+  const boldW = bold.widthOfTextAtSize(COMPANY_BOLD, boldSize)
+  const suffix = ' ' + COMPANY_SUFFIX
+  const sfxW = font.widthOfTextAtSize(suffix, suffixSize)
+  const startX = (PAGE_W - boldW - sfxW) / 2
+  page.drawText(COMPANY_BOLD, {
+    x: startX,
+    y: titleY - boldSize,
+    size: boldSize,
     font: bold,
     color: dark,
   })
-  y -= brandSize + 2
+  page.drawText(suffix, {
+    x: startX + boldW,
+    y: titleY - boldSize,
+    size: suffixSize,
+    font: font,
+    color: dark,
+  })
+
+  // === Riga 2: indirizzo + telefono (centrato) ===
+  const infoSize = 5.4
+  const infoY = titleY - 2.6 * MM
+  const infoW = font.widthOfTextAtSize(CONTACT_LINE, infoSize)
+  page.drawText(CONTACT_LINE, {
+    x: (PAGE_W - infoW) / 2,
+    y: infoY - infoSize,
+    size: infoSize,
+    font: font,
+    color: dark,
+  })
 
   // Linea separatrice
+  const sepY = infoY - infoSize - 1.1 * MM
   page.drawLine({
-    start: { x: MARGIN, y: y - 1 },
-    end: { x: PAGE_W - MARGIN, y: y - 1 },
+    start: { x: left, y: sepY },
+    end: { x: right, y: sepY },
     thickness: 0.3,
     color: gray,
   })
-  y -= 4
 
-  // 2. Numero riparazione (big, bold)
-  const ticketLabel = `RIP. ${data.ticketNumber}`
-  const ticketSize = 8
-  page.drawText(truncate(ticketLabel, 22), {
-    x: MARGIN,
-    y: y - ticketSize,
-    size: ticketSize,
+  // === Riga 3: RIP. N · CATEGORIA (bold) ===
+  const rowSize = 7.5
+  const row1Y = sepY - 2.5 * MM
+  const ripText = `RIP. ${data.ticketNumber}`
+  const category = (data.deviceCategory || '').trim().toUpperCase()
+  const line1 = category
+    ? `${ripText} · ${truncate(category, 18)}`
+    : ripText
+  page.drawText(truncate(line1, 36), {
+    x: left,
+    y: row1Y - rowSize,
+    size: rowSize,
     font: bold,
     color: dark,
   })
-  y -= ticketSize + 2
 
-  // 3. Nome cliente
-  const customer = truncate(data.customerName || '—', 28)
-  const custSize = 6.5
-  page.drawText(customer, {
-    x: MARGIN,
-    y: y - custSize,
-    size: custSize,
-    font: bold,
-    color: dark,
-  })
-  y -= custSize + 2
-
-  // 4. Modello dispositivo (+ categoria se presente)
-  const devParts: string[] = []
-  if (data.deviceCategory) devParts.push(data.deviceCategory.toUpperCase())
-  if (data.deviceModel) devParts.push(data.deviceModel)
-  const device = truncate(devParts.join(' · ') || '—', 32)
-  const devSize = 6
-  page.drawText(device, {
-    x: MARGIN,
-    y: y - devSize,
-    size: devSize,
-    font: font,
-    color: dark,
-  })
-  y -= devSize + 2
-
-  // 5. Telefono (se disponibile)
-  if (data.customerPhone) {
-    const phone = truncate(`Tel: ${data.customerPhone}`, 30)
-    page.drawText(phone, {
-      x: MARGIN,
-      y: y - devSize,
-      size: devSize,
+  // === Riga 4: Nome cliente · Tel. ===
+  const bodySize = 6.5
+  const row2Y = row1Y - 2.4 * MM
+  const name = (data.customerName || '').trim()
+  const phone = (data.customerPhone || '').trim()
+  const parts: string[] = []
+  if (name) parts.push(truncate(name, 22))
+  if (phone) parts.push(`Tel. ${truncate(phone, 15)}`)
+  if (parts.length) {
+    page.drawText(truncate(parts.join(' · '), 44), {
+      x: left,
+      y: row2Y - bodySize,
+      size: bodySize,
       font: font,
-      color: gray,
+      color: dark,
     })
-    y -= devSize + 2
   }
 
-  // 6. Data intake (bottom)
-  const date = `Intake: ${data.intakeDate}`
-  page.drawText(date, {
-    x: MARGIN,
-    y: MARGIN,
-    size: 6,
+  // === Riga 5: Modello + Intake (affiancati) ===
+  const row3Y = row2Y - 2.4 * MM
+  const model = truncate((data.deviceModel || '—').trim(), 22)
+  const intake = `Intake: ${data.intakeDate}`
+  page.drawText(model, {
+    x: left,
+    y: row3Y - bodySize,
+    size: bodySize,
     font: font,
-    color: gray,
+    color: dark,
+  })
+  const intakeW = font.widthOfTextAtSize(intake, bodySize)
+  page.drawText(intake, {
+    x: right - intakeW,
+    y: row3Y - bodySize,
+    size: bodySize,
+    font: font,
+    color: dark,
   })
 }
 

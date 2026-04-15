@@ -105,14 +105,14 @@ export default async function TicketDetailPage({
           <Badge variant="secondary">{ticket.priority}</Badge>
           <Badge>{ticket.payment_status}</Badge>
           <a
-            href={`/api/tickets/${id}/label`}
+            href={`/api/tickets/${id}/label?t=${Date.now()}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-100 transition-colors"
-            title="Genera PDF etichetta 50x30mm per il ticket"
+            title="Genera PDF etichetta 50x22mm per il ticket"
           >
             <Tag className="h-4 w-4" />
-            Etichetta
+            Stampa etichetta
           </a>
           <a
             href={`/api/tickets/${id}/fattura-xml`}

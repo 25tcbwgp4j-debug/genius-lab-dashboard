@@ -102,7 +102,6 @@ export async function GET(
     deviceCategory: deviceTyped.category,
     intakeDate: formatDate((ticket as { created_at: string }).created_at),
     customerPhone,
-    companyName: 'GENIUS LAB SRLS',
   })
 
   const safeNumber = (ticket as { ticket_number: string }).ticket_number.replace(
@@ -114,6 +113,7 @@ export async function GET(
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="Etichetta_${safeNumber}.pdf"`,
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
     },
   })
 }
