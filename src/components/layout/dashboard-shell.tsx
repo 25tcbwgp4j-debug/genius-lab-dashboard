@@ -10,6 +10,7 @@ import {
   Package,
   Wallet,
   MessageSquare,
+  MessageCircle,
   Settings,
   Wrench,
 } from 'lucide-react'
@@ -34,6 +35,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; can: (r:
   { href: '/dashboard/tickets', label: 'Riparazioni', icon: Ticket, can: () => true },
   { href: '/dashboard/inventory', label: 'Magazzino', icon: Package, can: canManageInventory },
   { href: '/dashboard/payments', label: 'Pagamenti', icon: Wallet, can: canViewPayments },
+  { href: '/dashboard/chat', label: 'Bot WhatsApp', icon: MessageCircle, can: () => true },
   { href: '/dashboard/communications', label: 'Comunicazioni', icon: MessageSquare, can: canAccessCommunications },
   { href: '/dashboard/settings', label: 'Impostazioni', icon: Settings, can: canAccessSettings },
 ]
