@@ -472,3 +472,25 @@ export function formatPhone(phone: string) {
   if (n.length === 10) return `+39 ${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`;
   return `+${phone}`;
 }
+
+// ===== Meta Templates (outbound) =====
+
+export interface MetaTemplate {
+  name: string;
+  category: "UTILITY" | "MARKETING" | "AUTHENTICATION";
+  params: string[];
+  description: string;
+}
+
+export async function listMetaTemplates() {
+  return apiGet<{ templates: MetaTemplate[] }>("/templates");
+}
+
+export async function sendMetaTemplate(payload: {
+  phone: string;
+  template_name: string;
+  parameters: string[];
+  language?: string;
+}) {
+  return apiPost<{ ok: boolean; result: unknown }>("/send-template", payload);
+}
