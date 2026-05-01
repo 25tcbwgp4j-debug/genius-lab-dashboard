@@ -54,8 +54,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Escludi asset statici e favicon dal proxy (non servono auth)
+  // Escludi asset statici, favicon, manifest PWA, service worker e icone dal proxy.
+  // Il manifest e il sw.js DEVONO essere accessibili senza auth altrimenti
+  // il browser non riesce a registrare la PWA / service worker / push notifications.
   matcher: [
-    "/((?!_next/static|_next/image|_next/data|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|_next/data|favicon.ico|robots.txt|sitemap.xml|manifest.json|sw.js|icon-.*\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf)$).*)",
   ],
 };
