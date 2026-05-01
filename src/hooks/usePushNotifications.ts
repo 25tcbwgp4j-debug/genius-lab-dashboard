@@ -54,10 +54,11 @@ export function usePushNotifications() {
       // Service worker ready
       const reg = await navigator.serviceWorker.ready;
 
-      // Subscribe al PushManager
+      // Subscribe al PushManager (cast esplicito per TS strict: Uint8Array → BufferSource)
+      const key = urlBase64ToUint8Array(public_key);
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(public_key),
+        applicationServerKey: key as unknown as BufferSource,
       });
 
       const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
