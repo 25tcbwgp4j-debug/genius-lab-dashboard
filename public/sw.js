@@ -44,7 +44,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Push notification handler (TODO: enable once VAPID keys are configured)
+// Push notification handler con vibration + actions
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   let payload;
@@ -58,12 +58,33 @@ self.addEventListener('push', (event) => {
     body: payload.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: payload.url || '/',
+    image: payload.image,
+    data: { url: payload.url || '/dashboard/chat', timestamp: Date.now() },
+    vibrate: [200, 100, 200, 100, 200],
+    tag: payload.tag || 'genius-lab-chat',
+    renotify: true,
+    requireInteraction: false,
+    actions: [
+      { action: 'open', title: '👀 Apri' },
+      { action: 'dismiss', title: '✕ Ignora' },
+    ],
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(self.clients.openWindow(event.notification.data || '/'));
+  if (event.action === 'dismiss') return;
+  const targetUrl = event.notification.data?.url || '/dashboard/chat';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // Se la dashboard è già aperta in un tab, focusla
+      for (const client of clients) {
+        if (client.url.includes('genius-lab-dashboard') && 'focus' in client) {
+          return client.focus().then((c) => c.navigate?.(targetUrl));
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
 });
