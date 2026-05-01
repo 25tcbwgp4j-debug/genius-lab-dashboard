@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -52,6 +53,27 @@ export function DashboardShell({ profile, children }: { profile: Profile; childr
   const push = usePushNotifications()
   const filtered = navItems.filter((item) => item.can(profile.role))
 
+  // Badge unread chat: polling 30s su /api/chat/conversations
+  const [unread, setUnread] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch('/api/chat/conversations')
+        if (!res.ok) return
+        const data = await res.json()
+        const list = data.conversations || []
+        const count = list.filter(
+          (c: { lastRole?: string }) => c.lastRole === 'user',
+        ).length
+        if (!cancelled) setUnread(count)
+      } catch { /* ignora */ }
+    }
+    fetchUnread()
+    const id = setInterval(fetchUnread, 30_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 border-r bg-card flex flex-col">
@@ -65,6 +87,7 @@ export function DashboardShell({ profile, children }: { profile: Profile; childr
           {filtered.map((item) => {
             const Icon = item.icon
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+            const showBadge = item.href === '/dashboard/chat' && unread > 0
             return (
               <Link
                 key={item.href}
@@ -75,7 +98,12 @@ export function DashboardShell({ profile, children }: { profile: Profile; childr
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {showBadge && (
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-semibold">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
               </Link>
             )
           })}
