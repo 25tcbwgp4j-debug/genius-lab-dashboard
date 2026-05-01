@@ -13,6 +13,10 @@ import {
   MessageCircle,
   Settings,
   Wrench,
+  Sun,
+  Moon,
+  Bell,
+  BellOff,
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
 import {
@@ -27,6 +31,8 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { signOut } from '@/app/actions/auth'
+import { useTheme } from '@/components/theme-provider'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
 
 const navItems: { href: string; label: string; icon: React.ElementType; can: (r: Profile['role']) => boolean }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, can: canAccessDashboard },
@@ -42,6 +48,8 @@ const navItems: { href: string; label: string; icon: React.ElementType; can: (r:
 
 export function DashboardShell({ profile, children }: { profile: Profile; children: React.ReactNode }) {
   const pathname = usePathname()
+  const { theme, toggleTheme } = useTheme()
+  const push = usePushNotifications()
   const filtered = navItems.filter((item) => item.can(profile.role))
 
   return (
@@ -77,7 +85,41 @@ export function DashboardShell({ profile, children }: { profile: Profile; childr
             {profile.display_name ?? 'Utente'}
           </p>
           <p className="text-xs text-muted-foreground px-3 py-1 capitalize">{profile.role}</p>
-          <form action={signOut} className="mt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start mt-2"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Passa al tema chiaro' : 'Passa al tema scuro'}
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+            {theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
+          </Button>
+          {push.status !== 'unsupported' && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start mt-1"
+              disabled={push.busy || push.status === 'denied'}
+              onClick={() => (push.status === 'subscribed' ? push.unsubscribe() : push.subscribe())}
+              aria-label={push.status === 'subscribed' ? 'Disattiva notifiche' : 'Attiva notifiche'}
+              title={push.status === 'denied' ? 'Permesso negato dal browser' : ''}
+            >
+              {push.status === 'subscribed' ? (
+                <Bell className="h-4 w-4 mr-2 text-emerald-500" />
+              ) : (
+                <BellOff className="h-4 w-4 mr-2" />
+              )}
+              {push.status === 'subscribed'
+                ? 'Notifiche attive'
+                : push.status === 'denied'
+                  ? 'Notifiche bloccate'
+                  : 'Attiva notifiche'}
+            </Button>
+          )}
+          <form action={signOut} className="mt-1">
             <Button type="submit" variant="ghost" size="sm" className="w-full justify-start">
               Esci
             </Button>
