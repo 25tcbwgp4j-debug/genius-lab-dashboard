@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus, Link as LinkIcon, Copy, ExternalLink } from 'lucide-react'
 import { recordPaymentAction } from '@/app/actions/payments'
 import type { PaymentMethod } from '@/types/database'
 
@@ -41,9 +41,10 @@ type Props = {
   amountPaid: number
   payments: PaymentRow[]
   canRecordPayment: boolean
+  ticketDescription?: string | null
 }
 
-export function TicketPaymentsCard({ ticketId, totalAmount, amountPaid, payments, canRecordPayment }: Props) {
+export function TicketPaymentsCard({ ticketId, totalAmount, amountPaid, payments, canRecordPayment, ticketDescription }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +53,66 @@ export function TicketPaymentsCard({ ticketId, totalAmount, amountPaid, payments
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
   const amountDue = Math.max(0, totalAmount - amountPaid)
+
+  // Stripe Checkout link generator
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkLoading, setLinkLoading] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [linkAmount, setLinkAmount] = useState('')
+  const [linkDescription, setLinkDescription] = useState('')
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  function openLinkForm() {
+    setLinkAmount(amountDue > 0 ? amountDue.toFixed(2) : totalAmount.toFixed(2))
+    setLinkDescription(ticketDescription || `Riparazione ticket ${ticketId.slice(0, 8)}`)
+    setGeneratedUrl(null)
+    setLinkError(null)
+    setLinkOpen(true)
+  }
+
+  async function generateCheckoutLink(e: React.FormEvent) {
+    e.preventDefault()
+    const num = parseFloat(linkAmount.replace(',', '.'))
+    if (Number.isNaN(num) || num <= 0) {
+      setLinkError('Importo non valido')
+      return
+    }
+    setLinkError(null)
+    setLinkLoading(true)
+    try {
+      const resp = await fetch('/api/backend/api/chat/payments/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticket_id: ticketId,
+          amount_eur: num,
+          description: linkDescription.trim() || `Ticket ${ticketId.slice(0, 8)}`,
+        }),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok || !data.url) {
+        setLinkError(data.error || `Errore HTTP ${resp.status}`)
+      } else {
+        setGeneratedUrl(data.url)
+      }
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'Errore rete')
+    } finally {
+      setLinkLoading(false)
+    }
+  }
+
+  async function copyToClipboard() {
+    if (!generatedUrl) return
+    try {
+      await navigator.clipboard.writeText(generatedUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // ignore
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -161,6 +222,74 @@ export function TicketPaymentsCard({ ticketId, totalAmount, amountPaid, payments
         )}
         {!canRecordPayment && payments.length === 0 && (
           <p className="text-sm text-muted-foreground">Nessun pagamento registrato.</p>
+        )}
+
+        {canRecordPayment && (
+          <div className="pt-3 border-t">
+            {!linkOpen && (
+              <Button type="button" variant="outline" size="sm" onClick={openLinkForm}>
+                <LinkIcon className="h-4 w-4 mr-1" />
+                Genera link Stripe
+              </Button>
+            )}
+            {linkOpen && (
+              <form onSubmit={generateCheckoutLink} className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Link pagamento online</span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setLinkOpen(false)} disabled={linkLoading}>
+                    Annulla
+                  </Button>
+                </div>
+                {linkError && <p className="text-sm text-destructive">{linkError}</p>}
+                <div className="space-y-1">
+                  <Label htmlFor="link-amount">Importo (€)</Label>
+                  <Input
+                    id="link-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={linkAmount}
+                    onChange={(e) => setLinkAmount(e.target.value)}
+                    disabled={linkLoading || !!generatedUrl}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="link-description">Descrizione</Label>
+                  <Input
+                    id="link-description"
+                    value={linkDescription}
+                    onChange={(e) => setLinkDescription(e.target.value)}
+                    disabled={linkLoading || !!generatedUrl}
+                  />
+                </div>
+                {!generatedUrl && (
+                  <Button type="submit" size="sm" disabled={linkLoading}>
+                    {linkLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <LinkIcon className="h-4 w-4 mr-1" />}
+                    Genera link
+                  </Button>
+                )}
+                {generatedUrl && (
+                  <div className="space-y-2">
+                    <Input value={generatedUrl} readOnly onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={copyToClipboard}>
+                        <Copy className="h-4 w-4 mr-1" />
+                        {copied ? 'Copiato!' : 'Copia'}
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" asChild>
+                        <a href={generatedUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Apri
+                        </a>
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Inviare il link al cliente via WhatsApp o email. Verrà registrato automaticamente quando completato.
+                    </p>
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

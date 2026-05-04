@@ -213,6 +213,7 @@ export default async function TicketDetailPage({
             notes: p.notes,
           }))}
           canRecordPayment={canRecordPay}
+          ticketDescription={ticket.intake_summary ?? ticket.diagnosis ?? null}
         />
         <TicketShippingCard
           ticketId={id}
