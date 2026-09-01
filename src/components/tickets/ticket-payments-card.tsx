@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -275,12 +277,15 @@ export function TicketPaymentsCard({ ticketId, totalAmount, amountPaid, payments
                         <Copy className="h-4 w-4 mr-1" />
                         {copied ? 'Copiato!' : 'Copia'}
                       </Button>
-                      <Button type="button" variant="outline" size="sm" asChild>
-                        <a href={generatedUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Apri
-                        </a>
-                      </Button>
+                      <a
+                        href={generatedUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Apri
+                      </a>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Inviare il link al cliente via WhatsApp o email. Verrà registrato automaticamente quando completato.
