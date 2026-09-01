@@ -9,7 +9,9 @@ import { ArrowLeft, Tag, FileDown } from 'lucide-react'
 import { TicketActions } from '@/components/tickets/ticket-actions'
 import { AIDiagnosisBlock } from '@/components/tickets/ai-diagnosis-block'
 // Rimosso getProfile e rbac: staff ha sempre accesso completo (auth password-based)
-import { EstimateCard } from '@/components/tickets/estimate-card'
+import { EstimateLinesCard } from '@/components/tickets/estimate-lines-card'
+import { WorkLogCard } from '@/components/tickets/work-log-card'
+import { OfficeOwnerCard } from '@/components/tickets/office-owner-card'
 import { TicketPaymentsCard } from '@/components/tickets/ticket-payments-card'
 import { TicketShippingCard } from '@/components/tickets/ticket-shipping-card'
 import { TicketTechnicianSelect } from '@/components/tickets/ticket-technician-select'
@@ -66,6 +68,8 @@ export default async function TicketDetailPage({
     { data: ticketPayments },
     { data: commFlags },
     { data: operatorsList },
+    { data: priceList },
+    { data: estimatePairs },
   ] = await Promise.all([
     supabase.from('ticket_events').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(20),
     supabase.from('ticket_ai_diagnosis').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(1),
@@ -73,6 +77,10 @@ export default async function TicketDetailPage({
     supabase.from('payments').select('id, amount, payment_method, payment_date, reference, notes').eq('ticket_id', id).order('payment_date', { ascending: false }),
     supabase.from('communication_flags').select('id, flag_type, sent_at').eq('ticket_id', id),
     supabase.from('operators').select('name').eq('active', true).order('name'),
+    supabase.from('price_list').select('id, label, intervention, price, is_shipping')
+      .eq('active', true).order('sort_order').order('label'),
+    supabase.from('estimate_pairs').select('id, label, first_line, second_line')
+      .eq('active', true).order('sort_order'),
   ])
 
   const latestAIDiagnosis = aiDiagnoses?.[0] ?? null
@@ -81,6 +89,14 @@ export default async function TicketDetailPage({
   const canRecordPay = true
   const canAssignTech = true
   const canChangeStatus = true
+
+  // Termini con cui cercare fra i preventivi già fatti, come si faceva in
+  // FileMaker: modello, anno e tipo di intervento («air 2020 logica»).
+  const dev = ticket.device as { model?: string; category?: string } | null
+  const cercaSimili = [
+    (dev?.model ?? '').match(/\b(air|pro|mini|imac|iphone|ipad|watch|airpods|studio)\b/i)?.[1]?.toLowerCase(),
+    (dev?.model ?? '').match(/\b(20\d{2})\b/)?.[1],
+  ].filter(Boolean).join(' ')
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const trackingLink = `${baseUrl}/track/${ticket.public_tracking_token}`
@@ -166,14 +182,12 @@ export default async function TicketDetailPage({
             )}
           </CardContent>
         </Card>
-        <EstimateCard
+        <EstimateLinesCard
           ticketId={id}
-          estimateLaborCost={Number(ticket.estimate_labor_cost ?? 0)}
-          estimatePartsCost={Number(ticket.estimate_parts_cost ?? 0)}
-          estimateNotes={(ticket as { estimate_notes?: string | null }).estimate_notes ?? null}
-          estimateItems={(ticket as { estimate_items?: { description: string; amount: number; list_price?: number | null }[] | null }).estimate_items ?? null}
-          totalAmount={Number(ticket.total_amount ?? 0)}
-          status={ticket.status as TicketStatus}
+          initialLines={Array.isArray(ticket.estimate_lines) ? ticket.estimate_lines : []}
+          priceList={priceList ?? []}
+          pairs={(estimatePairs ?? []) as never}
+          searchHint={cercaSimili}
           canEdit={canChangeStatus}
         />
         <Card>
@@ -294,6 +308,26 @@ export default async function TicketDetailPage({
           </dl>
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WorkLogCard
+          ticketId={id}
+          log={Array.isArray(ticket.work_log) ? ticket.work_log : []}
+          technicians={(technicians ?? []).map((t: { display_name: string | null }) => t.display_name ?? '').filter(Boolean)}
+          assignedTo={
+            (technicians ?? []).find((t: { id: string }) => t.id === ticket.assigned_technician_id)?.display_name ?? null
+          }
+          canEdit={canChangeStatus}
+        />
+        <OfficeOwnerCard
+          ticketId={id}
+          owner={ticket.office_owner ?? null}
+          reason={ticket.office_reason ?? null}
+          note={ticket.office_note ?? null}
+          people={(operatorsList ?? []).map((o: { name: string }) => o.name)}
+          canEdit={canChangeStatus}
+        />
+      </div>
 
       <CommunicationFlagsCard
         ticketId={id}
