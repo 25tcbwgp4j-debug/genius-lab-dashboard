@@ -89,9 +89,13 @@ export async function setOfficeOwnerAction(
   return { success: true }
 }
 
-/** Segna una tappa del percorso (arrivo, ricevuta, riparato…). */
+/** Segna una tappa del percorso (arrivo, ricevuta, riparato, consegna…). */
 export async function setMilestoneAction(ticketId: string, field: string, on: boolean) {
-  const consentiti = ['arrived_at', 'pickup_requested_at', 'intake_receipt_sent_at', 'repaired_at']
+  const consentiti = [
+    'arrived_at', 'pickup_requested_at', 'intake_receipt_sent_at', 'repaired_at',
+    'approved_at', 'refused_at', 'ready_for_pickup_at', 'ready_for_shipping_at',
+    'shipped_at', 'delivered_at', 'closed_at',
+  ]
   if (!consentiti.includes(field)) return { error: 'Tappa non riconosciuta' }
   const { supabase } = await guard()
   const { error } = await supabase
@@ -133,4 +137,38 @@ export async function lookupSerialAction(serial: string) {
     .eq('code', s.slice(-4))
     .maybeSingle()
   return { model: data ?? null }
+}
+
+/** Le schede per l'elenco di sinistra: le più recenti, o quelle che rispondono alla ricerca. */
+export async function listaSchedeAction(query: string, filtro: string) {
+  const supabase = await createClient()
+  let q = supabase
+    .from('tickets')
+    .select('id, ticket_number, status, office_owner, assigned_technician_id, created_at, customer:customers(first_name, last_name, company_name), device:devices(model, category)')
+    .order('created_at', { ascending: false })
+    .limit(60)
+
+  const t = query.trim()
+  if (t) {
+    // il numero di scheda si cerca da solo; il resto passa per nome e modello
+    if (/^\d+$/.test(t)) q = q.ilike('ticket_number', `%${t}%`)
+    else q = q.or(`ticket_number.ilike.%${t}%`)
+  }
+  if (filtro && filtro !== 'tutte') q = q.eq('status', filtro)
+
+  const { data, error } = await q
+  if (error) return { rows: [], error: error.message }
+  return { rows: data ?? [] }
+}
+
+/** I contatori in cima all'elenco. */
+export async function contatoriAction() {
+  const supabase = await createClient()
+  const stati = ['intake_completed', 'waiting_customer_approval', 'approved', 'in_repair', 'ready_for_pickup', 'new']
+  const out: Record<string, number> = {}
+  await Promise.all(stati.map(async (s) => {
+    const { count } = await supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('status', s)
+    out[s] = count ?? 0
+  }))
+  return out
 }

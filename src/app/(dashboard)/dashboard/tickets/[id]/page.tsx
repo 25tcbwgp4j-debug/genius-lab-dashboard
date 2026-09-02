@@ -1,14 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { buttonVariants } from '@/components/ui/button-variants'
-import { cn } from '@/lib/utils'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Tag, FileDown } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { TicketActions } from '@/components/tickets/ticket-actions'
 import { AIDiagnosisBlock } from '@/components/tickets/ai-diagnosis-block'
-// Rimosso getProfile e rbac: staff ha sempre accesso completo (auth password-based)
 import { EstimateLinesCard } from '@/components/tickets/estimate-lines-card'
 import { WorkLogCard } from '@/components/tickets/work-log-card'
 import { OfficeOwnerCard } from '@/components/tickets/office-owner-card'
@@ -16,60 +12,59 @@ import { TicketPaymentsCard } from '@/components/tickets/ticket-payments-card'
 import { TicketShippingCard } from '@/components/tickets/ticket-shipping-card'
 import { TicketTechnicianSelect } from '@/components/tickets/ticket-technician-select'
 import { TicketAcceptanceOperator } from '@/components/tickets/ticket-acceptance-operator'
-import { CommunicationFlagsCard } from '@/components/tickets/communication-flags-card'
+import { BancoPercorso } from '@/components/tickets/banco-percorso'
+import { BancoRack } from '@/components/tickets/banco-rack'
+import { BancoElenco } from '@/components/tickets/banco-elenco'
 import type { TicketStatus } from '@/types/database'
 
-// Auth password-based: niente RBAC, staff ha accesso completo (ruolo admin implicito).
-// Tutte le capability sono sempre vere.
+/**
+ * La scheda di riparazione, al banco.
+ *
+ * Tutto sta in una schermata sola, come in FileMaker: l'elenco a sinistra
+ * (non si «torna alla lista» per cambiare scheda), la scheda intera al centro
+ * e la pulsantiera a destra. Il percorso è in cima, perché la prima cosa da
+ * sapere è a che punto sta il pezzo.
+ */
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  new: 'Nuovo',
-  intake_completed: 'Intake completato',
-  in_diagnosis: 'In diagnosi',
-  ai_diagnosis_generated: 'Diagnosi AI generata',
-  estimate_ready: 'Preventivo pronto',
-  waiting_customer_approval: 'In attesa approvazione',
-  approved: 'Approvato',
-  refused: 'Rifiutato',
-  waiting_parts: 'In attesa ricambi',
-  in_repair: 'In riparazione',
-  testing: 'In test',
-  ready_for_pickup: 'Pronto ritiro',
-  ready_for_shipping: 'Pronto spedizione',
-  shipped: 'Spedito',
-  delivered: 'Consegnato',
-  unrepaired_returned: 'Restituito non riparato',
-  cancelled: 'Annullato',
+const ETICHETTA: Record<TicketStatus, string> = {
+  new: 'creata', intake_completed: 'da preventivare', in_diagnosis: 'in diagnosi',
+  ai_diagnosis_generated: 'diagnosi AI', estimate_ready: 'preventivo pronto',
+  waiting_customer_approval: 'preventivo inviato', approved: 'accettato', refused: 'rifiutato',
+  waiting_parts: 'attesa ricambi', in_repair: 'in lavorazione', testing: 'in collaudo',
+  ready_for_pickup: 'pronta', ready_for_shipping: 'da spedire', shipped: 'spedita',
+  delivered: 'chiusa', unrepaired_returned: 'resa non riparata', cancelled: 'annullata',
 }
+const COLORE = (s: string) =>
+  s === 'delivered' || s === 'shipped' ? 'bg-emerald-50 text-emerald-700'
+  : s === 'refused' || s === 'unrepaired_returned' || s === 'cancelled' ? 'bg-red-50 text-red-700'
+  : s === 'ready_for_pickup' || s === 'ready_for_shipping' ? 'bg-amber-50 text-amber-700'
+  : 'bg-muted text-muted-foreground'
 
-export default async function TicketDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+const Campo = ({ e, v, mono }: { e: string; v?: string | null; mono?: boolean }) => (
+  <div className="min-w-0">
+    <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{e}</dt>
+    <dd className={`break-words text-sm ${mono ? 'font-mono' : ''}`}>{v || '—'}</dd>
+  </div>
+)
+
+export default async function SchedaRiparazione({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: ticket } = await supabase
     .from('tickets')
-    .select(`
-      *,
-      customer:customers(id, first_name, last_name, email, phone, preferred_contact_channel),
-      device:devices(id, model, category, serial_number, customer_reported_issue, device_password, apple_id, apple_id_password, special_notes, passcode_notes, intake_condition)
-    `)
+    .select(`*,
+      customer:customers(id, first_name, last_name, company_name, email, phone, address, city),
+      device:devices(id, model, category, serial_number, customer_reported_issue,
+                     device_password, apple_id, apple_id_password, special_notes, intake_condition)`)
     .eq('id', id)
     .single()
   if (!ticket) notFound()
 
-  // Query parallele per performance (erano 8 query seriali, ora 6 senza auth)
   const [
-    { data: events },
-    { data: aiDiagnoses },
-    { data: technicians },
-    { data: ticketPayments },
-    { data: commFlags },
-    { data: operatorsList },
-    { data: priceList },
-    { data: estimatePairs },
+    { data: events }, { data: aiDiagnoses }, { data: technicians },
+    { data: ticketPayments }, { data: commFlags }, { data: operatorsList },
+    { data: priceList }, { data: estimatePairs },
+    { data: precedente }, { data: successiva },
   ] = await Promise.all([
     supabase.from('ticket_events').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(20),
     supabase.from('ticket_ai_diagnosis').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(1),
@@ -77,286 +72,185 @@ export default async function TicketDetailPage({
     supabase.from('payments').select('id, amount, payment_method, payment_date, reference, notes').eq('ticket_id', id).order('payment_date', { ascending: false }),
     supabase.from('communication_flags').select('id, flag_type, sent_at').eq('ticket_id', id),
     supabase.from('operators').select('name').eq('active', true).order('name'),
-    supabase.from('price_list').select('id, label, intervention, price, is_shipping')
-      .eq('active', true).order('sort_order').order('label'),
-    supabase.from('estimate_pairs').select('id, label, first_line, second_line')
-      .eq('active', true).order('sort_order'),
+    supabase.from('price_list').select('id, label, intervention, price, is_shipping').eq('active', true).order('sort_order').order('label'),
+    supabase.from('estimate_pairs').select('id, label, first_line, second_line').eq('active', true).order('sort_order'),
+    supabase.from('tickets').select('id').lt('created_at', ticket.created_at).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('tickets').select('id').gt('created_at', ticket.created_at).order('created_at', { ascending: true }).limit(1).maybeSingle(),
   ])
 
-  const latestAIDiagnosis = aiDiagnoses?.[0] ?? null
-  // Staff ha sempre accesso completo (auth password-based, ruolo admin implicito)
-  const canUseAI = true
-  const canRecordPay = true
-  const canAssignTech = true
-  const canChangeStatus = true
+  const canEdit = true                     // auth a password: lo staff ha accesso pieno
+  const dev = ticket.device as {
+    model?: string; category?: string; serial_number?: string; customer_reported_issue?: string
+    device_password?: string; apple_id?: string; apple_id_password?: string; intake_condition?: string
+  } | null
+  const cli = ticket.customer as {
+    first_name?: string; last_name?: string; company_name?: string
+    email?: string; phone?: string; address?: string; city?: string
+  } | null
+  const nomeCliente = cli?.company_name || [cli?.first_name, cli?.last_name].filter(Boolean).join(' ') || '—'
 
-  // Termini con cui cercare fra i preventivi già fatti, come si faceva in
-  // FileMaker: modello, anno e tipo di intervento («air 2020 logica»).
-  const dev = ticket.device as { model?: string; category?: string } | null
+  // i termini con cui cercare fra i preventivi già fatti, come in FileMaker
   const cercaSimili = [
     (dev?.model ?? '').match(/\b(air|pro|mini|imac|iphone|ipad|watch|airpods|studio)\b/i)?.[1]?.toLowerCase(),
     (dev?.model ?? '').match(/\b(20\d{2})\b/)?.[1],
   ].filter(Boolean).join(' ')
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const trackingLink = `${baseUrl}/track/${ticket.public_tracking_token}`
-  const estimateLink = `${baseUrl}/estimate/${ticket.public_tracking_token}`
+  const dati: Record<string, string | null> = {
+    created_at: ticket.created_at, pickup_requested_at: ticket.pickup_requested_at,
+    arrived_at: ticket.arrived_at, intake_receipt_sent_at: ticket.intake_receipt_sent_at,
+    estimate_sent_at: (commFlags ?? []).find((f: { flag_type: string }) => f.flag_type === 'estimate_sent')?.sent_at ?? null,
+    approved_at: ticket.approved_at, refused_at: ticket.refused_at, repaired_at: ticket.repaired_at,
+    ready_for_pickup_at: ticket.ready_for_pickup_at, shipped_at: ticket.shipped_at,
+    delivered_at: ticket.delivered_at, courier_name: ticket.courier_name,
+    tracking_code: ticket.tracking_code, public_tracking_token: ticket.public_tracking_token,
+  }
+
+  const Freccia = ({ verso, id: altro }: { verso: 'prec' | 'succ'; id?: string }) =>
+    altro ? (
+      <Link href={`/dashboard/tickets/${altro}`} aria-label={verso === 'prec' ? 'Scheda più recente' : 'Scheda più vecchia'}
+        className="rounded border px-2 py-1.5 hover:bg-muted">
+        {verso === 'prec' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      </Link>
+    ) : (
+      <span className="cursor-not-allowed rounded border px-2 py-1.5 opacity-30"
+        title={verso === 'prec' ? 'È la scheda più recente' : 'È la scheda più vecchia'}>
+        {verso === 'prec' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      </span>
+    )
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/tickets" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+    <div className="-m-4 grid h-[calc(100vh-4rem)] grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)_268px] lg:overflow-hidden">
+      {/* elenco: sempre lì, non si torna indietro per cambiare scheda */}
+      <aside className="hidden border-r bg-background lg:block lg:overflow-hidden">
+        <BancoElenco attivo={id} />
+      </aside>
+
+      {/* la scheda */}
+      <main className="space-y-4 overflow-y-auto p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Freccia verso="succ" id={successiva?.id} />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight font-mono">{ticket.ticket_number}</h1>
-            <p className="text-muted-foreground">
-              {ticket.device ? (ticket.device as { model: string; category: string }).model : '—'} ·{' '}
-              {STATUS_LABELS[ticket.status as TicketStatus] ?? ticket.status}
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">scheda n.</p>
+            <h1 className="font-mono text-2xl font-semibold leading-none tabular-nums">{ticket.ticket_number}</h1>
           </div>
+          <Freccia verso="prec" id={precedente?.id} />
+          <span className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${COLORE(ticket.status)}`}>
+            {ETICHETTA[ticket.status as TicketStatus] ?? ticket.status}
+          </span>
+          <span className="ml-auto"><TicketActions ticketId={id} currentStatus={ticket.status as TicketStatus} /></span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="secondary">{ticket.priority}</Badge>
-          <Badge>{ticket.payment_status}</Badge>
-          <a
-            href={`/api/tickets/${id}/label?t=${Date.now()}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-100 transition-colors"
-            title="Genera PDF etichetta 50x22mm per il ticket"
-          >
-            <Tag className="h-4 w-4" />
-            Stampa etichetta
-          </a>
-          <a
-            href={`/api/tickets/${id}/fattura-xml`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
-            title="Scarica XML FatturaPA da importare in SimplyFatt"
-          >
-            <FileDown className="h-4 w-4" />
-            Fattura XML
-          </a>
-        </div>
-      </div>
 
-      <TicketActions ticketId={id} currentStatus={ticket.status as TicketStatus} />
-
-      <div className="flex flex-wrap gap-4">
-        {canAssignTech || ticket.assigned_technician_id ? (
-          <TicketTechnicianSelect
-            ticketId={id}
-            assignedTechnicianId={ticket.assigned_technician_id}
-            technicians={(technicians ?? []).map((t) => ({ id: t.id, display_name: t.display_name }))}
-            canAssign={canAssignTech}
-          />
-        ) : null}
-        <TicketAcceptanceOperator
-          ticketId={id}
-          currentOperator={(ticket as { acceptance_operator?: string | null }).acceptance_operator ?? null}
-          operators={(operatorsList ?? []).map(o => o.name)}
-        />
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Cliente e dispositivo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>
-              <span className="text-muted-foreground">Cliente:</span>{' '}
-              <Link href={`/dashboard/customers/${(ticket.customer as { id: string }).id}`} className="text-primary hover:underline">
-                {(ticket.customer as { first_name: string; last_name: string }).first_name}{' '}
-                {(ticket.customer as { last_name: string }).last_name}
-              </Link>
-            </p>
-            <p><span className="text-muted-foreground">Email:</span> {(ticket.customer as { email: string }).email}</p>
-            <p><span className="text-muted-foreground">Telefono:</span> {(ticket.customer as { phone: string }).phone}</p>
-            <p><span className="text-muted-foreground">Dispositivo:</span>{' '}
-              {ticket.device ? `${(ticket.device as { model: string }).model} (${(ticket.device as { category: string }).category})` : '—'}
-            </p>
-            {ticket.device && (ticket.device as { serial_number?: string }).serial_number && (
-              <p><span className="text-muted-foreground">Serial:</span> {(ticket.device as { serial_number: string }).serial_number}</p>
-            )}
+          <CardHeader className="pb-2"><CardTitle className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Percorso della scheda</CardTitle></CardHeader>
+          <CardContent><BancoPercorso ticketId={id} dati={dati} stato={ticket.status} canEdit={canEdit} /></CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Cliente</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2"><Campo e="Nome o ragione sociale" v={nomeCliente} /></div>
+            <Campo e="Email" v={cli?.email} />
+            <Campo e="Telefono" v={cli?.phone} mono />
+            <div className="sm:col-span-2">
+              <Campo e="Indirizzo di spedizione" v={ticket.shipping_address || [cli?.address, cli?.city].filter(Boolean).join(' — ')} />
+            </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Dispositivo</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <Campo e="Modello" v={dev?.model} mono />
+            <Campo e="Numero di serie" v={dev?.serial_number} mono />
+            <div className="sm:col-span-2"><Campo e="Difetto indicato dal cliente" v={dev?.customer_reported_issue || ticket.intake_summary} /></div>
+            <div className="rounded-md border bg-muted/30 p-2.5 sm:col-span-2">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Accesso al dispositivo</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Campo e="Codice di sblocco" v={dev?.device_password} mono />
+                <Campo e="Apple ID" v={dev?.apple_id} mono />
+                <Campo e="Password Apple ID" v={dev?.apple_id_password} mono />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <EstimateLinesCard
           ticketId={id}
           initialLines={Array.isArray(ticket.estimate_lines) ? ticket.estimate_lines : []}
           priceList={priceList ?? []}
           pairs={(estimatePairs ?? []) as never}
           searchHint={cercaSimili}
-          canEdit={canChangeStatus}
+          canEdit={canEdit}
         />
+
         <Card>
-          <CardHeader>
-            <CardTitle>Importi e link</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Totale:</span> € {Number(ticket.total_amount).toFixed(2)}</p>
-            <p><span className="text-muted-foreground">Pagato:</span> € {Number(ticket.amount_paid).toFixed(2)}</p>
-            <p><span className="text-muted-foreground">Da saldare:</span> € {Math.max(0, Number(ticket.total_amount ?? 0) - Number(ticket.amount_paid ?? 0)).toFixed(2)}</p>
-            <p className="pt-2">
-              <span className="text-muted-foreground">Link tracking (pubblico):</span>
-              <br />
-              <a href={trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary break-all hover:underline">
-                {trackingLink}
-              </a>
-            </p>
-            <p>
-              <span className="text-muted-foreground">Link approvazione preventivo:</span>
-              <br />
-              <a href={estimateLink} target="_blank" rel="noopener noreferrer" className="text-primary break-all hover:underline">
-                {estimateLink}
-              </a>
-            </p>
+          <CardHeader className="pb-2"><CardTitle className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Chi ci sta lavorando</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <TicketTechnicianSelect ticketId={id} technicians={technicians ?? []} assignedTechnicianId={ticket.assigned_technician_id} canAssign={canEdit} />
+            <TicketAcceptanceOperator ticketId={id} operators={(operatorsList ?? []).map((o: { name: string }) => o.name)} currentOperator={ticket.acceptance_operator ?? null} />
           </CardContent>
         </Card>
-        <TicketPaymentsCard
-          ticketId={id}
-          totalAmount={Number(ticket.total_amount ?? 0)}
-          amountPaid={Number(ticket.amount_paid ?? 0)}
-          payments={(ticketPayments ?? []).map((p) => ({
-            id: p.id,
-            amount: Number(p.amount),
-            payment_method: p.payment_method,
-            payment_date: p.payment_date,
-            reference: p.reference,
-            notes: p.notes,
-          }))}
-          canRecordPayment={canRecordPay}
-          ticketDescription={ticket.intake_summary ?? ticket.diagnosis ?? null}
-        />
-        <TicketShippingCard
-          ticketId={id}
-          status={ticket.status as TicketStatus}
-          shippingRequired={Boolean(ticket.shipping_required)}
-          shippingAddress={ticket.shipping_address}
-          recipientName={ticket.recipient_name}
-          recipientPhone={ticket.recipient_phone}
-          courierName={ticket.courier_name}
-          trackingCode={ticket.tracking_code}
-          shippingNotes={ticket.shipping_notes}
-        />
-      </div>
 
-      <AIDiagnosisBlock
-        ticketId={id}
-        canUseAI={canUseAI}
-        latestDiagnosis={latestAIDiagnosis}
-        currentRiskFlags={ticket.ai_risk_flags}
-      />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <WorkLogCard ticketId={id} log={Array.isArray(ticket.work_log) ? ticket.work_log : []}
+            technicians={(technicians ?? []).map((t: { display_name: string | null }) => t.display_name ?? '').filter(Boolean)}
+            assignedTo={(technicians ?? []).find((t: { id: string }) => t.id === ticket.assigned_technician_id)?.display_name ?? null}
+            canEdit={canEdit} />
+          <OfficeOwnerCard ticketId={id} owner={ticket.office_owner ?? null} reason={ticket.office_reason ?? null}
+            note={ticket.office_note ?? null} people={(operatorsList ?? []).map((o: { name: string }) => o.name)} canEdit={canEdit} />
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Riepilogo riparazione</CardTitle>
-          <CardDescription>Dettaglio completo intake, diagnosi e dati dispositivo</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">Difetto segnalato</dt>
-            <dd>{(ticket.device as { customer_reported_issue?: string })?.customer_reported_issue ?? '—'}</dd>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <TicketPaymentsCard ticketId={id} payments={ticketPayments ?? []} totalAmount={ticket.total_amount}
+            amountPaid={ticket.amount_paid} canRecordPayment={canEdit} />
+          <TicketShippingCard ticketId={id} status={ticket.status} shippingRequired={ticket.shipping_required}
+            shippingAddress={ticket.shipping_address} recipientName={ticket.recipient_name}
+            recipientPhone={ticket.recipient_phone} courierName={ticket.courier_name}
+            trackingCode={ticket.tracking_code} shippingNotes={ticket.shipping_notes}
+            canEditShipping={canEdit} />
+        </div>
 
-            <dt className="text-muted-foreground">Dispositivo</dt>
-            <dd>{ticket.device ? `${(ticket.device as { model: string }).model} (${(ticket.device as { category: string }).category})` : '—'}</dd>
+        <AIDiagnosisBlock ticketId={id} canUseAI={canEdit} latestDiagnosis={aiDiagnoses?.[0] ?? null} currentRiskFlags={ticket.ai_risk_flags ?? null} />
 
-            <dt className="text-muted-foreground">Operatore accettazione</dt>
-            <dd>{(ticket as { acceptance_operator?: string | null }).acceptance_operator ?? '—'}</dd>
+        <Card className="border-dashed border-amber-400">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[11px] uppercase tracking-[0.1em] text-amber-700">
+              Parte interna — non compare nel PDF del cliente
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2"><Campo e="Lavorazione eseguita" v={ticket.diagnosis} /></div>
+            <Campo e="Condizione all'ingresso" v={dev?.intake_condition} />
+            <Campo e="Priorità" v={ticket.priority} />
+            <Campo e="Consegna prevista" v={ticket.expected_delivery_date} />
+            <Campo e="Stato pagamento" v={ticket.payment_status} />
+          </CardContent>
+        </Card>
 
-            <dt className="text-muted-foreground">Sintesi intake</dt>
-            <dd className="whitespace-pre-line">{ticket.intake_summary ?? '—'}</dd>
+        {(events?.length ?? 0) > 0 && (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Cronologia</CardTitle></CardHeader>
+            <CardContent>
+              <ul className="space-y-1.5 text-xs">
+                {(events ?? []).map((e: { id: string; event_type: string; created_at: string; note?: string }) => (
+                  <li key={e.id} className="flex gap-3">
+                    <time className="shrink-0 font-mono tabular-nums text-muted-foreground">
+                      {new Date(e.created_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </time>
+                    <span>{e.event_type}{e.note ? ` — ${e.note}` : ''}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+      </main>
 
-            <dt className="text-muted-foreground">Condizione ingresso</dt>
-            <dd>{(ticket.device as { intake_condition?: string })?.intake_condition ?? '—'}</dd>
-
-            <dt className="text-muted-foreground">Password dispositivo</dt>
-            <dd>{(ticket.device as { device_password?: string })?.device_password ?? '—'}</dd>
-
-            <dt className="text-muted-foreground">Apple ID</dt>
-            <dd>{(ticket.device as { apple_id?: string })?.apple_id ?? '—'}</dd>
-
-            <dt className="text-muted-foreground">Password Apple ID</dt>
-            <dd>{(ticket.device as { apple_id_password?: string })?.apple_id_password ?? '—'}</dd>
-
-            <dt className="text-muted-foreground">Garanzia 1° anno</dt>
-            <dd>{(ticket as { warranty_first_year?: boolean | null }).warranty_first_year ? 'Sì' : 'No'}</dd>
-
-            <dt className="text-muted-foreground">Garanzia 2° anno</dt>
-            <dd>{(ticket as { warranty_second_year?: boolean | null }).warranty_second_year ? 'Sì' : 'No'}</dd>
-
-            <dt className="text-muted-foreground">Spedizione</dt>
-            <dd>{(ticket as { shipping_type?: string | null }).shipping_type ?? (ticket.shipping_required ? 'Corriere' : 'A mano')}</dd>
-
-            <dt className="text-muted-foreground">Diagnosi tecnico</dt>
-            <dd className="whitespace-pre-line">{ticket.diagnosis ?? '—'}</dd>
-
-            {(ticket.device as { special_notes?: string })?.special_notes && (
-              <>
-                <dt className="text-muted-foreground">Note speciali</dt>
-                <dd className="whitespace-pre-line">{(ticket.device as { special_notes: string }).special_notes}</dd>
-              </>
-            )}
-
-            {ticket.status === 'refused' && (ticket as { refused_note?: string | null }).refused_note && (
-              <>
-                <dt className="text-muted-foreground text-destructive">Note rifiuto</dt>
-                <dd className="text-destructive">{(ticket as { refused_note: string }).refused_note}</dd>
-              </>
-            )}
-          </dl>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <WorkLogCard
-          ticketId={id}
-          log={Array.isArray(ticket.work_log) ? ticket.work_log : []}
-          technicians={(technicians ?? []).map((t: { display_name: string | null }) => t.display_name ?? '').filter(Boolean)}
-          assignedTo={
-            (technicians ?? []).find((t: { id: string }) => t.id === ticket.assigned_technician_id)?.display_name ?? null
-          }
-          canEdit={canChangeStatus}
-        />
-        <OfficeOwnerCard
-          ticketId={id}
-          owner={ticket.office_owner ?? null}
-          reason={ticket.office_reason ?? null}
-          note={ticket.office_note ?? null}
-          people={(operatorsList ?? []).map((o: { name: string }) => o.name)}
-          canEdit={canChangeStatus}
-        />
-      </div>
-
-      <CommunicationFlagsCard
-        ticketId={id}
-        flags={(commFlags ?? []).map(f => ({ id: f.id, flag_type: f.flag_type, sent_at: f.sent_at }))}
-      />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Timeline eventi</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {events?.length ? (
-            <ul className="space-y-2 text-sm">
-              {events.map((e) => (
-                <li key={e.id} className="flex gap-2">
-                  <span className="text-muted-foreground shrink-0">
-                    {new Date(e.created_at).toLocaleString('it-IT')}
-                  </span>
-                  <span>{e.event_type}</span>
-                  {e.from_status && <Badge variant="outline">{e.from_status}</Badge>}
-                  {e.to_status && <Badge>{e.to_status}</Badge>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground text-sm">Nessun evento.</p>
-          )}
-        </CardContent>
-      </Card>
+      {/* la pulsantiera */}
+      <aside className="border-t bg-background p-3 lg:overflow-y-auto lg:border-l lg:border-t-0">
+        <BancoRack ticketId={id} flags={commFlags ?? []} dati={dati}
+          spedizione={!!ticket.shipping_required} canEdit={canEdit} />
+      </aside>
     </div>
   )
 }
