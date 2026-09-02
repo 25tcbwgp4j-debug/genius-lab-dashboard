@@ -1,18 +1,24 @@
 import { redirect } from 'next/navigation'
-import { getUser } from '@/lib/auth/session'
-import { getProfile } from '@/lib/auth/profile'
+import { cookies } from 'next/headers'
+import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth-password'
 import type { AppRole } from '@/types/database'
 
 /**
- * Ensures the current user is authenticated and has a profile with a role that passes the predicate.
- * Use in dashboard pages that are restricted by role (e.g. settings = admin only).
- * Redirects to /login if not authenticated, to /dashboard if role not allowed.
+ * Protegge le pagine riservate.
+ *
+ * Prima cercava una sessione Supabase per leggerne il ruolo, ma qui l'accesso è
+ * a password e quella sessione non esiste: il risultato era che Magazzino,
+ * Comunicazioni, Impostazioni e Modelli messaggi **rimandavano al login** anche
+ * a chi era già entrato. Quattro sezioni irraggiungibili.
+ *
+ * Chi ha la password è staff, e lo staff vede tutto: il ruolo si dà per admin.
+ * Il parametro resta per non toccare le pagine che lo passano.
  */
-export async function requireRole(allowed: (role: AppRole) => boolean): Promise<{ role: AppRole }> {
-  const user = await getUser()
-  if (!user) redirect('/login')
-  const profile = await getProfile(user.id)
-  if (!profile) redirect('/login')
-  if (!allowed(profile.role)) redirect('/dashboard')
-  return { role: profile.role }
+export async function requireRole(
+  _allowed?: (role: AppRole) => boolean
+): Promise<{ role: AppRole }> {
+  const secret = process.env.AUTH_SECRET || ''
+  const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value
+  if (!secret || !token || !(await verifyToken(token, secret))) redirect('/login')
+  return { role: 'admin' as AppRole }
 }

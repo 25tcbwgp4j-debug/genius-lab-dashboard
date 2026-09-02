@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveTemplate, type TemplateKey } from './template-resolver'
 import { getEmailAdapter } from './email/resend-service'
 import { renderEmailToHtmlAndText } from './email/render-email'
@@ -41,7 +41,7 @@ export interface SendCommunicationResult {
  * - Communication logging: every send attempt (success or failure) is logged to communications table for audit.
  */
 export async function sendCommunication(params: SendPayload): Promise<SendCommunicationResult> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: customer } = await supabase
     .from('customers')
     .select('id, email, phone, whatsapp_phone, preferred_contact_channel')

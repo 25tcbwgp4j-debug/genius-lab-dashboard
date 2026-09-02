@@ -49,7 +49,7 @@ export async function GET(
   const supabase = createAdminClient()
   const { data: ticket } = await supabase
     .from('tickets')
-    .select('id')
+    .select('id, ticket_number')
     .eq('public_tracking_token', token.trim())
     .single()
   if (!ticket) {
@@ -57,7 +57,14 @@ export async function GET(
   }
   const ticketId = ticket.id
   let bytes: Uint8Array
-  const filename = (t: string) => `GeniusLab-${t}-${token.slice(0, 8)}.pdf`
+  /* Il file si chiama col numero di scheda, come il PDF che FileMaker salvava
+     sulla scrivania: chi lo allega su WhatsApp lo riconosce senza aprirlo. */
+  const nomi: Record<string, string> = {
+    intake: 'scheda-ingresso', estimate: 'preventivo',
+    payment: 'consuntivo', report: 'rapporto',
+  }
+  const filename = (t: string) =>
+    `${ticket.ticket_number ?? token.slice(0, 8)} ${nomi[t] ?? t}.pdf`
   try {
     switch (type as DocumentType) {
       case 'intake': {
@@ -91,10 +98,11 @@ export async function GET(
     console.error('[documents] PDF generation failed', type, e)
     return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
   }
+  const scarica = searchParams.get('download') === '1'
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="${filename(type)}"`,
+      'Content-Disposition': `${scarica ? 'attachment' : 'inline'}; filename="${filename(type)}"`,
     },
   })
 }

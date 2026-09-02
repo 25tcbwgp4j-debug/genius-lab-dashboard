@@ -3,6 +3,7 @@
 import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
 import { richiediStaff } from '@/lib/auth/staff'
+import { dispatchNotification, type NotificationEvent } from '@/services/notifications/dispatch'
 import { total, estimateText, type EstimateLine } from '@/lib/banco/estimate'
 
 /** Gli unici stati che un filtro può chiedere. */
@@ -182,4 +183,67 @@ export async function contatoriAction() {
     out[s] = count ?? 0
   }))
   return out
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Mandare davvero la mail al cliente.
+
+   Prima la pulsantiera si limitava a segnare «inviata»: la mail la si scriveva
+   a mano, come in FileMaker. Qui parte da sola — stesso testo dei modelli, con
+   il link al PDF della scheda — e il flag si mette solo se è partita davvero.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+
+/** Quale comunicazione corrisponde a quale tasto della pulsantiera. */
+const TASTO_A_EVENTO: Record<string, NotificationEvent> = {
+  intake_sent: 'intake_created',
+  estimate_sent: 'estimate_ready',
+  update_sent: 'repair_update',
+  ready_sent: 'ready_for_pickup',
+  payment_sent: 'payment_instructions',
+  shipped_sent: 'shipped',
+}
+
+export async function inviaComunicazioneAction(ticketId: string, tasto: string) {
+  await richiediStaff()
+  const evento = TASTO_A_EVENTO[tasto]
+  if (!evento) return { error: 'Comunicazione non riconosciuta' }
+
+  const supabase = await createStaffClient()
+
+  // senza indirizzo non si manda niente, e va detto prima di provarci
+  const { data: t } = await supabase
+    .from('tickets')
+    .select('id, customer:customers(email, phone)')
+    .eq('id', ticketId)
+    .single()
+  const cli = t?.customer as { email?: string; phone?: string } | null
+  if (!cli?.email && !cli?.phone) {
+    return { error: 'Questo cliente non ha né email né telefono: la comunicazione non può partire.' }
+  }
+
+  const esito = await dispatchNotification(evento, ticketId)
+  if (!esito.ok && !esito.emailSent && !esito.whatsappSent) {
+    return { error: esito.errors.join(' · ') || 'Invio non riuscito' }
+  }
+
+  // il flag si mette solo adesso: segna che è partita davvero
+  const { data: gia } = await supabase
+    .from('communication_flags')
+    .select('id')
+    .eq('ticket_id', ticketId)
+    .eq('flag_type', tasto)
+    .maybeSingle()
+  if (!gia) {
+    await supabase.from('communication_flags')
+      .insert({ ticket_id: ticketId, flag_type: tasto, sent_at: new Date().toISOString() })
+  }
+
+  refresh(ticketId)
+  return {
+    success: true,
+    email: !!esito.emailSent,
+    whatsapp: !!esito.whatsappSent,
+    a: cli?.email || cli?.phone || '',
+  }
 }

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { IAIDiagnosisProvider, AIDiagnosisResult } from '@/lib/ai/provider'
 import { OpenAIDiagnosisAdapter } from '@/lib/ai/openai-adapter'
 import { AnthropicDiagnosisAdapter } from '@/lib/ai/anthropic-adapter'
@@ -28,7 +28,7 @@ export async function runAIDiagnosis(ticketId: string): Promise<
 > {
   const startMs = Date.now()
   logAIDiagnosis('info', 'AI diagnosis request started', { ticketId, success: false })
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: ticket } = await supabase
     .from('tickets')
     .select(`
