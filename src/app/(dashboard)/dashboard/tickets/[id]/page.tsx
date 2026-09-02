@@ -128,12 +128,12 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
       {/* la scheda */}
       <main className="space-y-4 overflow-y-auto p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Freccia verso="succ" id={successiva?.id} />
+          <Freccia verso="prec" id={successiva?.id} />
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">scheda n.</p>
             <h1 className="font-mono text-2xl font-semibold leading-none tabular-nums">{ticket.ticket_number}</h1>
           </div>
-          <Freccia verso="prec" id={precedente?.id} />
+          <Freccia verso="succ" id={precedente?.id} />
           <span className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${COLORE(ticket.status)}`}>
             {ETICHETTA[ticket.status as TicketStatus] ?? ticket.status}
           </span>

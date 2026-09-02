@@ -1,0 +1,24 @@
+
+> genius-lab@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.57:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 357ms
+ GET /dashboard/tickets/3016da47-196d-4a16-9372-1e4b023bf254 404 in 1918ms (compile: 273ms, proxy.ts: 53ms, render: 1593ms)
+ GET /api/chat/conversations 404 in 41ms (compile: 20ms, proxy.ts: 1671µs, render: 19ms)
+ GET /api/chat/conversations 404 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 20ms)
+ GET /api/chat/conversations 404 in 28ms (compile: 4ms, proxy.ts: 5ms, render: 20ms)
+ GET /api/chat/conversations 404 in 30ms (compile: 5ms, proxy.ts: 4ms, render: 20ms)
+ GET /api/chat/conversations 404 in 27ms (compile: 3ms, proxy.ts: 5ms, render: 19ms)
+ GET /api/chat/conversations 404 in 28ms (compile: 5ms, proxy.ts: 4ms, render: 19ms)
+ GET /api/chat/conversations 404 in 26ms (compile: 4ms, proxy.ts: 4ms, render: 18ms)
+ GET /api/chat/conversations 404 in 28ms (compile: 5ms, proxy.ts: 4ms, render: 20ms)
+ GET /dashboard/tickets/3016da47-196d-4a16-9372-1e4b023bf254 404 in 954ms (compile: 3ms, proxy.ts: 1545µs, render: 949ms)
+ GET /api/chat/conversations 404 in 18ms (compile: 1671µs, proxy.ts: 2ms, render: 14ms)
+ GET /api/chat/conversations 404 in 20ms (compile: 2ms, proxy.ts: 2ms, render: 16ms)
+[?25h
