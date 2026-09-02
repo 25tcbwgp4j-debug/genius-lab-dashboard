@@ -6,6 +6,14 @@ import { requireUserAndProfile } from '@/lib/auth/require-auth'
 import { canChangeTicketStatus } from '@/lib/auth/rbac'
 import { total, estimateText, type EstimateLine } from '@/lib/banco/estimate'
 
+/** Gli unici stati che un filtro può chiedere. */
+const STATI = [
+  'new', 'intake_completed', 'in_diagnosis', 'ai_diagnosis_generated', 'estimate_ready',
+  'waiting_customer_approval', 'approved', 'refused', 'waiting_parts', 'in_repair',
+  'testing', 'ready_for_pickup', 'ready_for_shipping', 'shipped', 'delivered',
+  'unrepaired_returned', 'cancelled',
+]
+
 async function guard() {
   const { profile } = await requireUserAndProfile()
   if (!canChangeTicketStatus(profile.role)) throw new Error('Non autorizzato a modificare il ticket')
@@ -107,9 +115,14 @@ export async function setMilestoneAction(ticketId: string, field: string, on: bo
   return { success: true }
 }
 
+/* PostgREST usa virgole e parentesi come sintassi nei filtri `or`: un termine
+   che le contiene cambierebbe la query. Si tengono solo lettere, cifre e spazi. */
+const pulisci = (t: string) => t.replace(/[^\p{L}\p{N} _-]/gu, '').trim()
+
 /** Cerca fra i preventivi già fatti: più parole = più stretto, come in FileMaker. */
 export async function searchPastEstimatesAction(query: string) {
-  const terms = query.trim().split(/\s+/).filter(Boolean)
+  await requireUserAndProfile()
+  const terms = query.trim().split(/\s+/).map(pulisci).filter(Boolean).slice(0, 6)
   if (!terms.length) return { rows: [] }
   const supabase = await createClient()
   let q = supabase
@@ -128,7 +141,8 @@ export async function searchPastEstimatesAction(query: string) {
 
 /** Le ultime 4 cifre del seriale Apple sono il codice del modello. */
 export async function lookupSerialAction(serial: string) {
-  const s = String(serial || '').trim().toUpperCase()
+  await requireUserAndProfile()
+  const s = String(serial || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (s.length < 11) return { model: null }   // i seriali nuovi a 10 caratteri non dicono nulla
   const supabase = await createClient()
   const { data } = await supabase
@@ -141,6 +155,7 @@ export async function lookupSerialAction(serial: string) {
 
 /** Le schede per l'elenco di sinistra: le più recenti, o quelle che rispondono alla ricerca. */
 export async function listaSchedeAction(query: string, filtro: string) {
+  await requireUserAndProfile()
   const supabase = await createClient()
   let q = supabase
     .from('tickets')
@@ -148,13 +163,10 @@ export async function listaSchedeAction(query: string, filtro: string) {
     .order('created_at', { ascending: false })
     .limit(60)
 
-  const t = query.trim()
-  if (t) {
-    // il numero di scheda si cerca da solo; il resto passa per nome e modello
-    if (/^\d+$/.test(t)) q = q.ilike('ticket_number', `%${t}%`)
-    else q = q.or(`ticket_number.ilike.%${t}%`)
-  }
-  if (filtro && filtro !== 'tutte') q = q.eq('status', filtro)
+  const t = pulisci(query).slice(0, 40)
+  if (t) q = q.ilike('ticket_number', `%${t}%`)
+  // lo stato arriva da un elenco chiuso: quello che non c'è si ignora
+  if (filtro && filtro !== 'tutte' && STATI.includes(filtro)) q = q.eq('status', filtro)
 
   const { data, error } = await q
   if (error) return { rows: [], error: error.message }
@@ -163,6 +175,7 @@ export async function listaSchedeAction(query: string, filtro: string) {
 
 /** I contatori in cima all'elenco. */
 export async function contatoriAction() {
+  await requireUserAndProfile()
   const supabase = await createClient()
   const stati = ['intake_completed', 'waiting_customer_approval', 'approved', 'in_repair', 'ready_for_pickup', 'new']
   const out: Record<string, number> = {}
