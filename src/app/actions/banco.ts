@@ -2,8 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
-import { canChangeTicketStatus } from '@/lib/auth/rbac'
+import { richiediStaff } from '@/lib/auth/staff'
 import { total, estimateText, type EstimateLine } from '@/lib/banco/estimate'
 
 /** Gli unici stati che un filtro può chiedere. */
@@ -15,9 +14,8 @@ const STATI = [
 ]
 
 async function guard() {
-  const { profile } = await requireUserAndProfile()
-  if (!canChangeTicketStatus(profile.role)) throw new Error('Non autorizzato a modificare il ticket')
-  return { profile, supabase: await createClient() }
+  await richiediStaff()
+  return { supabase: await createClient() }
 }
 const refresh = (id: string) => {
   revalidatePath(`/dashboard/tickets/${id}`)
@@ -121,7 +119,7 @@ const pulisci = (t: string) => t.replace(/[^\p{L}\p{N} _-]/gu, '').trim()
 
 /** Cerca fra i preventivi già fatti: più parole = più stretto, come in FileMaker. */
 export async function searchPastEstimatesAction(query: string) {
-  await requireUserAndProfile()
+  await richiediStaff()
   const terms = query.trim().split(/\s+/).map(pulisci).filter(Boolean).slice(0, 6)
   if (!terms.length) return { rows: [] }
   const supabase = await createClient()
@@ -141,7 +139,7 @@ export async function searchPastEstimatesAction(query: string) {
 
 /** Le ultime 4 cifre del seriale Apple sono il codice del modello. */
 export async function lookupSerialAction(serial: string) {
-  await requireUserAndProfile()
+  await richiediStaff()
   const s = String(serial || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (s.length < 11) return { model: null }   // i seriali nuovi a 10 caratteri non dicono nulla
   const supabase = await createClient()
@@ -155,7 +153,7 @@ export async function lookupSerialAction(serial: string) {
 
 /** Le schede per l'elenco di sinistra: le più recenti, o quelle che rispondono alla ricerca. */
 export async function listaSchedeAction(query: string, filtro: string) {
-  await requireUserAndProfile()
+  await richiediStaff()
   const supabase = await createClient()
   let q = supabase
     .from('tickets')
@@ -175,7 +173,7 @@ export async function listaSchedeAction(query: string, filtro: string) {
 
 /** I contatori in cima all'elenco. */
 export async function contatoriAction() {
-  await requireUserAndProfile()
+  await richiediStaff()
   const supabase = await createClient()
   const stati = ['intake_completed', 'waiting_customer_approval', 'approved', 'in_repair', 'ready_for_pickup', 'new']
   const out: Record<string, number> = {}
