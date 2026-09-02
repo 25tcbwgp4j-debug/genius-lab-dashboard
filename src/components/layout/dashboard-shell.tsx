@@ -35,16 +35,23 @@ import { signOut } from '@/app/actions/auth'
 import { useTheme } from '@/components/theme-provider'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 
-const navItems: { href: string; label: string; icon: React.ElementType; can: (r: Profile['role']) => boolean }[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, can: canAccessDashboard },
-  { href: '/dashboard/customers', label: 'Clienti', icon: Users, can: canAccessCustomers },
-  { href: '/dashboard/devices', label: 'Dispositivi', icon: Smartphone, can: canAccessDevices },
-  { href: '/dashboard/tickets', label: 'Riparazioni', icon: Ticket, can: () => true },
-  { href: '/dashboard/inventory', label: 'Magazzino', icon: Package, can: canManageInventory },
-  { href: '/dashboard/payments', label: 'Pagamenti', icon: Wallet, can: canViewPayments },
-  { href: '/dashboard/chat', label: 'Bot WhatsApp', icon: MessageCircle, can: () => true },
-  { href: '/dashboard/communications', label: 'Comunicazioni', icon: MessageSquare, can: canAccessCommunications },
-  { href: '/dashboard/settings', label: 'Impostazioni', icon: Settings, can: canAccessSettings },
+/* Il menu segue il lavoro al banco, non la struttura del database.
+   «Schede» sta in cima perché è lì che si passa la giornata; il resto è
+   raggruppato per quando serve davvero. Nomi come li usa chi ci lavora. */
+const navItems: { href: string; label: string; icon: React.ElementType; can: (r: Profile['role']) => boolean; gruppo: string }[] = [
+  { href: '/dashboard/tickets', label: 'Schede', icon: Ticket, can: () => true, gruppo: 'Banco' },
+  { href: '/dashboard/tickets/new', label: 'Nuova scheda', icon: Package, can: () => true, gruppo: 'Banco' },
+  { href: '/dashboard', label: 'Come va', icon: LayoutDashboard, can: canAccessDashboard, gruppo: 'Banco' },
+
+  { href: '/dashboard/customers', label: 'Clienti', icon: Users, can: canAccessCustomers, gruppo: 'Anagrafiche' },
+  { href: '/dashboard/devices', label: 'Dispositivi', icon: Smartphone, can: canAccessDevices, gruppo: 'Anagrafiche' },
+  { href: '/dashboard/inventory', label: 'Ricambi', icon: Package, can: canManageInventory, gruppo: 'Anagrafiche' },
+
+  { href: '/dashboard/payments', label: 'Incassi', icon: Wallet, can: canViewPayments, gruppo: 'Soldi e messaggi' },
+  { href: '/dashboard/chat', label: 'WhatsApp', icon: MessageCircle, can: () => true, gruppo: 'Soldi e messaggi' },
+  { href: '/dashboard/communications', label: 'Mail inviate', icon: MessageSquare, can: canAccessCommunications, gruppo: 'Soldi e messaggi' },
+
+  { href: '/dashboard/settings', label: 'Impostazioni', icon: Settings, can: canAccessSettings, gruppo: 'Altro' },
 ]
 
 export function DashboardShell({ profile, children }: { profile: Profile; children: React.ReactNode }) {
@@ -83,14 +90,26 @@ export function DashboardShell({ profile, children }: { profile: Profile; childr
             Genius Lab
           </Link>
         </div>
-        <nav className="flex-1 p-2 space-y-0.5">
-          {filtered.map((item) => {
+        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {filtered.map((item, i) => {
             const Icon = item.icon
-            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+            // «Schede» resta acceso solo sull'elenco, non su ogni sotto-pagina
+            const active =
+              item.href === '/dashboard' || item.href === '/dashboard/tickets/new'
+                ? pathname === item.href
+                : item.href === '/dashboard/tickets'
+                  ? pathname.startsWith('/dashboard/tickets') && pathname !== '/dashboard/tickets/new'
+                  : pathname.startsWith(item.href)
+            const nuovoGruppo = i === 0 || filtered[i - 1].gruppo !== item.gruppo
             const showBadge = item.href === '/dashboard/chat' && unread > 0
             return (
+              <div key={item.href}>
+              {nuovoGruppo && (
+                <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground first:pt-1">
+                  {item.gruppo}
+                </p>
+              )}
               <Link
-                key={item.href}
                 href={item.href}
                 className={cn(
                   'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
@@ -105,6 +124,7 @@ export function DashboardShell({ profile, children }: { profile: Profile; childr
                   </span>
                 )}
               </Link>
+              </div>
             )
           })}
         </nav>

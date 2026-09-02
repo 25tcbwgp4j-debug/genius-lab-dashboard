@@ -1,9 +1,9 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Tag, FileDown, Printer } from 'lucide-react'
-import { toggleCommunicationFlag } from '@/app/actions/communication-flags'
+import { inviaComunicazioneAction } from '@/app/actions/banco'
 
 /**
  * La pulsantiera del banco.
@@ -32,7 +32,21 @@ export function BancoRack({
   canEdit: boolean
 }) {
   const [pending, start] = useTransition()
+  const [esito, setEsito] = useState<{ ok: boolean; testo: string } | null>(null)
   const mappa = new Map(flags.map((f) => [f.flag_type, f]))
+
+  /* La mail parte davvero: stesso testo dei modelli, col link al PDF della
+     scheda. Il tasto diventa verde solo se l'invio è andato a buon fine. */
+  const invia = (tasto: string, etichetta: string) =>
+    start(async () => {
+      setEsito(null)
+      const r = await inviaComunicazioneAction(ticketId, tasto)
+      if (r?.error) setEsito({ ok: false, testo: r.error })
+      else {
+        const vie = [r?.email && 'email', r?.whatsapp && 'WhatsApp'].filter(Boolean).join(' e ')
+        setEsito({ ok: true, testo: `${etichetta}: inviata via ${vie || 'email'} a ${r?.a ?? ''}` })
+      }
+    })
 
   /* Il passo che tocca adesso. Se manca un presupposto, non si propone niente
      e si dice perché. */
@@ -65,7 +79,7 @@ export function BancoRack({
     const ora = k === passo
     return (
       <button type="button" disabled={!canEdit || pending}
-        onClick={() => start(async () => { await toggleCommunicationFlag(ticketId, k) })}
+        onClick={() => invia(k, t)}
         className={`relative mb-1.5 flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left text-[13px] font-medium transition-colors ${
           f ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
             : ora ? 'border-orange-500 bg-orange-500 text-white hover:brightness-110'
@@ -104,17 +118,33 @@ export function BancoRack({
       <Titolo>Consuntivo — {spedizione ? 'spedizione' : 'ritiro'}</Titolo>
       <Btn k="payment_sent" t={`Consuntivo + ${spedizione ? 'spedizione' : 'ritiro'}`} />
 
-      <Titolo>Stampa</Titolo>
+      {esito && (
+        <p className={`mb-2 rounded border px-2.5 py-2 text-xs leading-snug ${
+          esito.ok ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                   : 'border-red-300 bg-red-50 text-red-800'}`}>
+          {esito.testo}
+        </p>
+      )}
+      {pending && <p className="mb-2 text-xs text-muted-foreground">Sto inviando…</p>}
+
+      <Titolo>Stampa e PDF</Titolo>
       <a href={`/api/tickets/${ticketId}/label?t=${Date.now()}`} target="_blank" rel="noopener noreferrer"
         className="mb-1.5 flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-[13px] font-medium hover:bg-muted/50">
         <span className="flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" />Etichetta</span>
         <kbd className="rounded border px-1 font-mono text-[9.5px] font-normal text-muted-foreground">banco</kbd>
       </a>
-      <a href={`/api/documents/intake?ticket=${ticketId}`} target="_blank" rel="noopener noreferrer"
-        className="mb-1.5 flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-[13px] font-medium hover:bg-muted/50">
-        <span className="flex items-center gap-1.5"><Printer className="h-3.5 w-3.5" />Scheda per il cliente</span>
-        <kbd className="rounded border px-1 font-mono text-[9.5px] font-normal text-muted-foreground">pdf</kbd>
-      </a>
+      {[
+        { t: 'intake', e: 'Scheda di ingresso' },
+        { t: 'estimate', e: 'Preventivo' },
+        { t: 'payment', e: 'Consuntivo e pagamento' },
+        { t: 'report', e: 'Rapporto finale' },
+      ].map((d) => (
+        <a key={d.t} href={`/api/documents/${d.t}?token=${dati.public_tracking_token}&download=1`}
+          className="mb-1.5 flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-[13px] font-medium hover:bg-muted/50">
+          <span className="flex items-center gap-1.5"><Printer className="h-3.5 w-3.5" />{d.e}</span>
+          <kbd className="rounded border px-1 font-mono text-[9.5px] font-normal text-muted-foreground">scarica</kbd>
+        </a>
+      ))}
       <a href={`/api/tickets/${ticketId}/fattura-xml`}
         className="flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-[13px] font-medium hover:bg-muted/50">
         <span className="flex items-center gap-1.5"><FileDown className="h-3.5 w-3.5" />Fattura XML</span>

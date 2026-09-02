@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type TemplateKey =
   | 'intake_created'
@@ -92,7 +92,7 @@ export async function resolveTemplate(
   channel: 'email' | 'whatsapp',
   payload: Record<string, string>
 ): Promise<{ subject?: string; body: string }> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: row } = await supabase
     .from('message_templates')
     .select('subject, body')

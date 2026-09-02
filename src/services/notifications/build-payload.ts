@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { TemplateKey } from '@/services/communications/template-resolver'
 
 export async function buildNotificationPayload(
@@ -6,7 +6,7 @@ export async function buildNotificationPayload(
   templateKey: TemplateKey,
   overrides?: Partial<Record<string, string>>
 ): Promise<{ customerId: string; payload: Record<string, string> } | null> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: ticket } = await supabase
     .from('tickets')
     .select(`
