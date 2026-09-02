@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, Trash2, Search, Check } from 'lucide-react'
 import { saveEstimateLinesAction, searchPastEstimatesAction } from '@/app/actions/banco'
 import { parseEstimate, total, totalWith, num, type EstimateLine } from '@/lib/banco/estimate'
+import { LavoriRicorrenti } from './lavori-ricorrenti'
 
 type PriceRow = { id: string; label: string; intervention: string | null; price: number | null; is_shipping: boolean }
 type Pair = { id: string; label: string; first_line: { t: string; nota?: string; i?: string }; second_line: { t: string; nota?: string; i?: string } }
@@ -17,7 +18,7 @@ const eur = (n: number) => (n ? `€ ${n.toLocaleString('it-IT')}` : '—')
 const NOTE = [null, 'compreso recupero dati', 'senza recupero dati', 'solo recupero dati']
 
 export function EstimateLinesCard({
-  ticketId, initialLines, priceList, pairs, searchHint, prezzi = [], canEdit,
+  ticketId, initialLines, priceList, pairs, searchHint, prezzi = [], modello = '', canEdit,
 }: {
   ticketId: string
   initialLines: EstimateLine[]
@@ -25,6 +26,7 @@ export function EstimateLinesCard({
   pairs: Pair[]
   searchHint: string
   prezzi?: Prezzo[]
+  modello?: string
   canEdit: boolean
 }) {
   const [lines, setLines] = useState<EstimateLine[]>(initialLines ?? [])
@@ -175,6 +177,13 @@ export function EstimateLinesCard({
 
         {canEdit && (
           <>
+            <section>
+              <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Già fatto su questo modello — un clic e il preventivo è dentro
+              </h4>
+              <LavoriRicorrenti modello={modello} canEdit={canEdit} onCopia={(righe) => save(righe)} />
+            </section>
+
             {pairs.length > 0 && (
               <section>
                 <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

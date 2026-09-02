@@ -247,3 +247,84 @@ export async function inviaComunicazioneAction(ticketId: string, tasto: string) 
     a: cli?.email || cli?.phone || '',
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   «Che abbiamo fatto l'ultima volta su questo stesso modello?»
+
+   È il gesto con cui si lavora davvero: si cerca una scheda dello stesso
+   modello e dello stesso anno, e si copia il preventivo — tanto le lavorazioni
+   sono sempre quelle, batteria display scheda logica, e sugli iMac il disco.
+   Nei dati regge: 3.102 riparazioni su 6.688 sono lo stesso lavoro sullo stesso
+   modello e anno. Qui non c'è da cercare niente: appena si apre la scheda i
+   lavori già fatti su quel modello sono lì, ognuno col suo ultimo preventivo.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export type LavoroRicorrente = {
+  lavorazione: string
+  volte: number
+  prezzo: number
+  ultimo: { card_no: string; body: string; price: number; year: number; month: number }
+}
+
+const TIPI: [string, RegExp][] = [
+  ['batteria', /BATTER/],
+  ['display', /DISPLAY|SCHERMO|LCD/],
+  ['scheda logica', /SCHEDA LOGICA|MLB|MAIN LOGIC/],
+  ['disco o SSD', /\bSSD\b|HARD ?DISK|\bDISCO\b/],
+  ['memoria', /MEMORI|\bRAM\b/],
+  ['tastiera', /TASTIER|TOP ?CASE/],
+  ['danno da liquido', /LIQUID|OSSID/],
+  ['software', /SOFTWARE|FORMATTAZ|RECUPERO DATI/],
+]
+
+export async function lavoriSuQuestoModelloAction(modello: string) {
+  await richiediStaff()
+  const m = (modello || '').trim()
+  if (m.length < 4) return { gruppi: [] as LavoroRicorrente[] }
+
+  const supabase = await createStaffClient()
+  const anno = m.match(/\b(20\d{2})\b/)?.[1]
+
+  // stesso modello: prima si prova per intero, poi ci si allarga all'anno
+  let { data } = await supabase
+    .from('past_estimates')
+    .select('card_no, body, price, year, month, model')
+    .ilike('model', `%${m.replace(/[%,()]/g, ' ').trim()}%`)
+    .order('year', { ascending: false }).order('month', { ascending: false })
+    .limit(120)
+
+  if ((!data || data.length < 3) && anno) {
+    const base = m.split(/[(,]/)[0].trim().replace(/[%,()]/g, ' ')
+    const r = await supabase
+      .from('past_estimates')
+      .select('card_no, body, price, year, month, model')
+      .ilike('model', `%${base}%`).ilike('model', `%${anno}%`)
+      .order('year', { ascending: false }).order('month', { ascending: false })
+      .limit(120)
+    data = r.data ?? []
+  }
+
+  const per = new Map<string, { righe: typeof data; }>()
+  for (const z of data ?? []) {
+    const t = (z.body || '').toUpperCase()
+    const tipo = TIPI.find(([, rx]) => rx.test(t))?.[0]
+    if (!tipo) continue
+    if (!per.has(tipo)) per.set(tipo, { righe: [] })
+    per.get(tipo)!.righe!.push(z)
+  }
+
+  const gruppi: LavoroRicorrente[] = []
+  for (const [lavorazione, { righe }] of per) {
+    const v = righe ?? []
+    if (!v.length) continue
+    const prezzi = v.map((x) => Number(x.price)).filter((n) => n > 0).sort((a, b) => a - b)
+    gruppi.push({
+      lavorazione,
+      volte: v.length,
+      prezzo: prezzi.length ? prezzi[Math.floor(prezzi.length / 2)] : 0,
+      ultimo: v[0] as LavoroRicorrente['ultimo'],   // già ordinati dal più recente
+    })
+  }
+  gruppi.sort((a, b) => b.volte - a.volte)
+  return { gruppi }
+}
