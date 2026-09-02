@@ -105,36 +105,41 @@ export function EstimateLinesCard({
             const isAlt = r.opt != null
             return (
               <div key={i}
-                className={`grid grid-cols-[auto_1fr_auto_5.5rem_auto_auto] items-center gap-2 rounded-md border px-2 py-1.5 ${
+                className={`rounded-md border px-2.5 py-2 ${
                   isAlt ? (r.on ? 'border-orange-300 bg-orange-50/50' : 'border-muted opacity-60') : 'bg-muted/30'
                 }`}>
-                {isAlt ? (
-                  <button type="button" disabled={!canEdit} onClick={() => choose(i)}
-                    className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
-                      r.on ? 'bg-orange-500 text-white' : 'border text-muted-foreground'}`}
-                    title="Il cliente sceglie questa">{(r.opt ?? 0) + 1}ª</button>
-                ) : <span />}
-                <span className={`text-sm leading-snug break-words ${isAlt && !r.on ? 'line-through decoration-muted' : ''}`}>
-                  {r.t}
-                  {r.listino ? <em className="ml-2 font-mono text-[10px] not-italic text-muted-foreground line-through">listino € {r.listino}</em> : null}
-                  {r.nota ? <em className="ml-2 rounded bg-emerald-50 px-1.5 text-[10px] not-italic text-emerald-700">{r.nota}</em> : null}
-                </span>
-                <button type="button" disabled={!canEdit} title="Recupero dati"
-                  onClick={() => patch(i, { nota: NOTE[(NOTE.indexOf(r.nota ?? null) + 1) % NOTE.length] })}
-                  className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground">
-                  {r.nota ? r.nota.split(' ')[0] : 'rec. dati'}
-                </button>
-                <Input value={String(r.p ?? '')} disabled={!canEdit} inputMode="numeric"
-                  onChange={(e) => patch(i, { p: e.target.value.replace(/[^\d]/g, '') })}
-                  className="h-7 text-right font-mono tabular-nums" placeholder="—" aria-label="Importo" />
-                <button type="button" disabled={!canEdit} onClick={() => patch(i, { iva: !r.iva })}
-                  className={`rounded border px-1.5 py-0.5 text-[10px] ${r.iva ? 'bg-foreground text-background' : 'text-muted-foreground'}`}>
-                  +IVA
-                </button>
-                <button type="button" disabled={!canEdit} onClick={() => drop(i)}
-                  className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label="Togli la riga">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-start gap-2">
+                  {isAlt && (
+                    <button type="button" disabled={!canEdit} onClick={() => choose(i)}
+                      className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                        r.on ? 'bg-orange-500 text-white' : 'border text-muted-foreground'}`}
+                      title="Il cliente sceglie questa">{(r.opt ?? 0) + 1}ª</button>
+                  )}
+                  <span className={`min-w-0 flex-1 text-sm leading-snug break-words ${
+                    isAlt && !r.on ? 'line-through decoration-muted' : ''}`}>
+                    {r.t}
+                    {r.listino ? <em className="ml-2 font-mono text-[10px] not-italic text-muted-foreground line-through">listino € {r.listino}</em> : null}
+                    {r.nota ? <em className="ml-2 whitespace-nowrap rounded bg-emerald-50 px-1.5 text-[10px] not-italic text-emerald-700">{r.nota}</em> : null}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex items-center justify-end gap-1.5">
+                  <button type="button" disabled={!canEdit} title="Recupero dati: compreso / senza / solo / niente"
+                    onClick={() => patch(i, { nota: NOTE[(NOTE.indexOf(r.nota ?? null) + 1) % NOTE.length] })}
+                    className="rounded border px-1.5 py-0.5 text-[10px] whitespace-nowrap text-muted-foreground hover:text-foreground">
+                    {r.nota ? r.nota.split(' ')[0] : 'rec. dati'}
+                  </button>
+                  <button type="button" disabled={!canEdit} onClick={() => patch(i, { iva: !r.iva })}
+                    className={`rounded border px-1.5 py-0.5 text-[10px] ${r.iva ? 'bg-foreground text-background' : 'text-muted-foreground'}`}>
+                    +IVA
+                  </button>
+                  <Input value={String(r.p ?? '')} disabled={!canEdit} inputMode="numeric"
+                    onChange={(e) => patch(i, { p: e.target.value.replace(/[^\d]/g, '') })}
+                    className="h-7 w-24 text-right font-mono tabular-nums" placeholder="—" aria-label="Importo" />
+                  <button type="button" disabled={!canEdit} onClick={() => drop(i)}
+                    className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label="Togli la riga">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             )
           })}
