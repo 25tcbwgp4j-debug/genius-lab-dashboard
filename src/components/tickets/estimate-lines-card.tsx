@@ -9,20 +9,22 @@ import { saveEstimateLinesAction, searchPastEstimatesAction } from '@/app/action
 import { parseEstimate, total, totalWith, num, type EstimateLine } from '@/lib/banco/estimate'
 
 type PriceRow = { id: string; label: string; intervention: string | null; price: number | null; is_shipping: boolean }
-type Pair = { id: string; label: string; first_line: { t: string; nota?: string }; second_line: { t: string; nota?: string } }
+type Pair = { id: string; label: string; first_line: { t: string; nota?: string; i?: string }; second_line: { t: string; nota?: string; i?: string } }
+type Prezzo = { family: string; intervention: string; price: number; jobs: number; basis: string }
 type Past = { card_no: string; model: string | null; family: string | null; fault: string | null; body: string; price: number | null; year: number | null; month: number | null }
 
 const eur = (n: number) => (n ? `€ ${n.toLocaleString('it-IT')}` : '—')
 const NOTE = [null, 'compreso recupero dati', 'senza recupero dati', 'solo recupero dati']
 
 export function EstimateLinesCard({
-  ticketId, initialLines, priceList, pairs, searchHint, canEdit,
+  ticketId, initialLines, priceList, pairs, searchHint, prezzi = [], canEdit,
 }: {
   ticketId: string
   initialLines: EstimateLine[]
   priceList: PriceRow[]
   pairs: Pair[]
   searchHint: string
+  prezzi?: Prezzo[]
   canEdit: boolean
 }) {
   const [lines, setLines] = useState<EstimateLine[]>(initialLines ?? [])
@@ -32,6 +34,11 @@ export function EstimateLinesCard({
   const [past, setPast] = useState<Past[] | null>(null)
   const [searching, setSearching] = useState(false)
 
+  /* Quanto è stato incassato su questo stesso dispositivo per questo lavoro.
+     Non è una stima: è la mediana dei preventivi accettati. */
+  const prezzoDi = (intervento: string | null) =>
+    intervento ? prezzi.find((p) => p.intervention === intervento) ?? null : null
+
   const save = (next: EstimateLine[]) => {
     setLines(next)
     start(async () => {
@@ -40,7 +47,9 @@ export function EstimateLinesCard({
     })
   }
 
-  const add = (t: string, p: number | null, asOption = false) => {
+  const add = (t: string, p: number | null, asOption = false, intervento: string | null = null) => {
+    // se il listino generale non dà un prezzo, si usa quello di questo dispositivo
+    if (p == null) p = prezzoDi(intervento)?.price ?? null
     const opts = lines.filter((r) => r.opt != null).length
     save([...lines, {
       t, p: p == null ? '' : p, iva: false, listino: null, nota: null,
@@ -49,9 +58,11 @@ export function EstimateLinesCard({
   }
   const addPair = (pr: Pair) => {
     const opts = lines.filter((r) => r.opt != null).length
+    const pa = prezzoDi((pr.first_line as { i?: string }).i ?? null)?.price ?? ''
+    const pb = prezzoDi((pr.second_line as { i?: string }).i ?? null)?.price ?? ''
     save([...lines,
-      { t: pr.first_line.t, p: '', nota: pr.first_line.nota ?? null, opt: opts, on: opts === 0 },
-      { t: pr.second_line.t, p: '', nota: pr.second_line.nota ?? null, opt: opts + 1, on: false },
+      { t: pr.first_line.t, p: pa, nota: pr.first_line.nota ?? null, opt: opts, on: opts === 0 },
+      { t: pr.second_line.t, p: pb, nota: pr.second_line.nota ?? null, opt: opts + 1, on: false },
     ])
   }
   const patch = (i: number, p: Partial<EstimateLine>) =>
@@ -202,14 +213,20 @@ export function EstimateLinesCard({
               <div className="max-h-64 space-y-0.5 overflow-y-auto rounded-md border p-1">
                 {catalogue.map((p) => (
                   <div key={p.id} className="flex items-stretch gap-1">
-                    <button type="button" onClick={() => add(p.label, p.price)}
+                    <button type="button" onClick={() => add(p.label, p.price, false, p.intervention)}
                       className="flex flex-1 items-start justify-between gap-3 rounded px-2 py-1.5 text-left text-xs leading-snug hover:bg-orange-50">
                       <span className="break-words">{p.label}</span>
                       <b className="shrink-0 font-mono text-muted-foreground">
-                        {p.price === 0 ? 'senza addebito' : p.price == null ? 'prezzo a mano' : eur(Number(p.price))}
+                        {p.price === 0 ? 'senza addebito'
+                          : p.price != null ? eur(Number(p.price))
+                          : prezzoDi(p.intervention)
+                            ? <span className="text-orange-600" title={`mediana di ${prezzoDi(p.intervention)!.jobs} lavori accettati su questo dispositivo`}>
+                                {eur(prezzoDi(p.intervention)!.price)}
+                              </span>
+                            : 'prezzo a mano'}
                       </b>
                     </button>
-                    <button type="button" onClick={() => add(p.label, p.price, true)}
+                    <button type="button" onClick={() => add(p.label, p.price, true, p.intervention)}
                       title="Aggiungi come ipotesi alternativa"
                       className="rounded px-2 text-[10px] text-muted-foreground hover:bg-orange-50 hover:text-orange-600">
                       ipotesi
