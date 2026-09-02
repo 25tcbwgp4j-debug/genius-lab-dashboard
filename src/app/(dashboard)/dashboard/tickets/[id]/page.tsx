@@ -63,7 +63,7 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
   const [
     { data: events }, { data: aiDiagnoses }, { data: technicians },
     { data: ticketPayments }, { data: commFlags }, { data: operatorsList },
-    { data: priceList }, { data: estimatePairs },
+    { data: priceList }, { data: estimatePairs }, { data: prezziDispositivo },
     { data: precedente }, { data: successiva },
   ] = await Promise.all([
     supabase.from('ticket_events').select('*').eq('ticket_id', id).order('created_at', { ascending: false }).limit(20),
@@ -74,6 +74,7 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
     supabase.from('operators').select('name').eq('active', true).order('name'),
     supabase.from('price_list').select('id, label, intervention, price, is_shipping').eq('active', true).order('sort_order').order('label'),
     supabase.from('estimate_pairs').select('id, label, first_line, second_line').eq('active', true).order('sort_order'),
+    supabase.from('price_by_device').select('family, intervention, price, jobs, basis'),
     supabase.from('tickets').select('id').lt('created_at', ticket.created_at).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('tickets').select('id').gt('created_at', ticket.created_at).order('created_at', { ascending: true }).limit(1).maybeSingle(),
   ])
@@ -90,6 +91,29 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
   const nomeCliente = cli?.company_name || [cli?.first_name, cli?.last_name].filter(Boolean).join(' ') || '—'
 
   // i termini con cui cercare fra i preventivi già fatti, come in FileMaker
+  /* Il prezzo dipende dal dispositivo: una batteria su un Air 13" sta a 124 €,
+     sullo stesso lavoro un Pro 15" ne fa 210. Si cerca la famiglia dal modello. */
+  const famiglia = (() => {
+    const m = (dev?.model ?? '').toUpperCase()
+    if (/MACBOOK ?PRO/.test(m)) {
+      const p = m.match(/\b(13|14|15|16|17)[-\s]?INCH|\b(13|14|15|16|17)"/)
+      const n = p?.[1] ?? p?.[2]
+      return n ? `MACBOOK PRO ${n}" RETINA` : null
+    }
+    if (/MACBOOK ?AIR/.test(m)) {
+      return /RETINA|M1|M2|M3|M4|20(1[89]|2\d)/.test(m) ? 'MACBOOK AIR 13" RETINA' : 'MACBOOK AIR 13"'
+    }
+    if (/IMAC/.test(m)) {
+      const p = m.match(/\b(21|24|27)/)
+      return p ? `IMAC ${p[1]}" RETINA` : null
+    }
+    if (/IPHONE/.test(m)) {
+      const p = m.match(/IPHONE ?(\d+ ?(PRO ?MAX|PRO|PLUS|MINI)?|X[RS]?|SE)/)
+      return p ? `IPHONE ${p[1]}`.trim() : null
+    }
+    return (dev?.model ?? '').toUpperCase() || null
+  })()
+
   const cercaSimili = [
     (dev?.model ?? '').match(/\b(air|pro|mini|imac|iphone|ipad|watch|airpods|studio)\b/i)?.[1]?.toLowerCase(),
     (dev?.model ?? '').match(/\b(20\d{2})\b/)?.[1],
@@ -180,6 +204,9 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
           priceList={priceList ?? []}
           pairs={(estimatePairs ?? []) as never}
           searchHint={cercaSimili}
+          prezzi={(prezziDispositivo ?? []).filter(
+            (r: { family: string }) => r.family === famiglia
+          )}
           canEdit={canEdit}
         />
 
