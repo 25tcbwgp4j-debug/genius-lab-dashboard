@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -14,7 +14,7 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data: customer } = await supabase.from('customers').select('*').eq('id', id).single()
   if (!customer) notFound()
 

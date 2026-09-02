@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -14,7 +14,7 @@ export default async function CustomersPage({
   searchParams: Promise<{ q?: string }>
 }) {
   const { q } = await searchParams
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   let query = supabase.from('customers').select('*').order('updated_at', { ascending: false })
   if (q?.trim()) {
     const term = `%${q.trim()}%`

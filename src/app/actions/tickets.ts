@@ -1,12 +1,12 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getNextTicketNumber } from '@/services/tickets/numbering'
 import { nanoid } from 'nanoid'
 import { dispatchNotification } from '@/services/notifications/dispatch'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 import { canCreateTicket, canChangeTicketStatus, canEditTicketShipping, canAssignTechnician } from '@/lib/auth/rbac'
 import { isAllowedTransition } from '@/lib/ticket-workflow'
 import type { TicketStatus } from '@/types/database'
@@ -25,7 +25,7 @@ const NOTIFICATION_TO_FLAG: Record<string, string> = {
 async function autoSetCommunicationFlag(ticketId: string, event: string, userId: string) {
   const flagType = NOTIFICATION_TO_FLAG[event]
   if (!flagType) return
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   // Upsert: se il flag esiste già non lo duplica (UNIQUE constraint)
   await supabase.from('communication_flags').upsert(
     { ticket_id: ticketId, flag_type: flagType, sent_by: userId, sent_at: new Date().toISOString() },
@@ -39,9 +39,8 @@ export async function createTicket(payload: {
   priority?: 'low' | 'normal' | 'high' | 'urgent'
   intake_summary?: string
 }) {
-  const { user, profile } = await requireUserAndProfile()
-  if (!canCreateTicket(profile.role)) throw new Error('Non autorizzato a creare ticket')
-  const supabase = await createClient()
+  const staff = await richiediStaff()
+  const supabase = await createStaffClient()
 
   const ticketNumber = await getNextTicketNumber()
   const publicToken = nanoid(32)
@@ -52,7 +51,7 @@ export async function createTicket(payload: {
       ticket_number: ticketNumber,
       customer_id: payload.customer_id,
       device_id: payload.device_id,
-      created_by_user_id: user.id as string,
+      created_by_user_id: staff,
       priority: payload.priority ?? 'normal',
       status: 'intake_completed',
       intake_summary: payload.intake_summary ?? null,
@@ -68,7 +67,7 @@ export async function createTicket(payload: {
     ticket_id: ticket.id,
     event_type: 'created',
     to_status: 'intake_completed',
-    user_id: user.id,
+    user_id: staff,
     metadata: {},
   })
 
@@ -78,11 +77,11 @@ export async function createTicket(payload: {
     await supabase.from('ticket_events').insert({
       ticket_id: ticket.id,
       event_type: 'notification_sent',
-      user_id: user.id,
+      user_id: staff,
       metadata: { event: notifResult.event, template_key: notifResult.templateKey, channels },
     })
     // Auto-flag: segna scheda ingresso come inviata
-    await autoSetCommunicationFlag(ticket.id, notifResult.event, user.id)
+    await autoSetCommunicationFlag(ticket.id, notifResult.event, staff)
   }
 
   revalidatePath('/dashboard/tickets')
@@ -95,9 +94,8 @@ export async function updateTicketStatus(
   newStatus: string,
   metadata?: Record<string, unknown>
 ) {
-  const { user, profile } = await requireUserAndProfile()
-  if (!canChangeTicketStatus(profile.role)) throw new Error('Non autorizzato a modificare lo stato del ticket')
-  const supabase = await createClient()
+  const staff = await richiediStaff()
+  const supabase = await createStaffClient()
 
   const { data: ticket } = await supabase.from('tickets').select('status').eq('id', ticketId).single()
   if (!ticket) throw new Error('Ticket non trovato')
@@ -139,7 +137,7 @@ export async function updateTicketStatus(
     event_type: 'status_change',
     from_status: ticket.status,
     to_status: newStatus,
-    user_id: user.id,
+    user_id: staff,
     metadata: metadata ?? {},
   })
 
@@ -158,11 +156,11 @@ export async function updateTicketStatus(
     await supabase.from('ticket_events').insert({
       ticket_id: ticketId,
       event_type: 'notification_sent',
-      user_id: user.id,
+      user_id: staff,
       metadata: { event: res.event, template_key: res.templateKey, channels },
     })
     // Auto-flag: segna automaticamente la comunicazione come inviata
-    await autoSetCommunicationFlag(ticketId, res.event, user.id)
+    await autoSetCommunicationFlag(ticketId, res.event, staff)
   }
 
   if (newStatus === 'estimate_ready') {
@@ -177,7 +175,7 @@ export async function updateTicketStatus(
         event_type: 'status_change',
         from_status: 'estimate_ready',
         to_status: 'waiting_customer_approval',
-        user_id: user.id,
+        user_id: staff,
         metadata: {},
       })
     }
@@ -222,9 +220,8 @@ export async function updateTicketShipping(
     shipping_notes?: string | null
   }
 ) {
-  const { profile } = await requireUserAndProfile()
-  if (!canEditTicketShipping(profile.role)) throw new Error('Non autorizzato a modificare i dati di spedizione')
-  const supabase = await createClient()
+  const staff = await richiediStaff()
+  const supabase = await createStaffClient()
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (payload.shipping_required !== undefined) updates.shipping_required = payload.shipping_required
   if (payload.shipping_address !== undefined) updates.shipping_address = payload.shipping_address ?? null
@@ -239,9 +236,8 @@ export async function updateTicketShipping(
 }
 
 export async function assignTechnicianAction(ticketId: string, assignedTechnicianId: string | null) {
-  const { user, profile } = await requireUserAndProfile()
-  if (!canAssignTechnician(profile.role)) throw new Error('Non autorizzato a assegnare tecnici')
-  const supabase = await createClient()
+  const staff = await richiediStaff()
+  const supabase = await createStaffClient()
   const { error } = await supabase
     .from('tickets')
     .update({
@@ -253,7 +249,7 @@ export async function assignTechnicianAction(ticketId: string, assignedTechnicia
   await supabase.from('ticket_events').insert({
     ticket_id: ticketId,
     event_type: 'technician_assigned',
-    user_id: user.id,
+    user_id: staff,
     metadata: { assigned_technician_id: assignedTechnicianId },
   })
   revalidatePath(`/dashboard/tickets/${ticketId}`)
@@ -262,8 +258,8 @@ export async function assignTechnicianAction(ticketId: string, assignedTechnicia
 }
 
 export async function updateAcceptanceOperatorAction(ticketId: string, operator: string | null) {
-  await requireUserAndProfile()
-  const supabase = await createClient()
+  const staff = await richiediStaff()
+  const supabase = await createStaffClient()
   const { error } = await supabase
     .from('tickets')
     .update({

@@ -1,8 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 import { canRecordPayment } from '@/lib/auth/rbac'
 import type { PaymentMethod } from '@/types/database'
 
@@ -14,9 +14,8 @@ export async function recordPaymentAction(payload: {
   reference?: string
   notes?: string
 }) {
-  const { user, profile } = await requireUserAndProfile()
-  if (!canRecordPayment(profile.role)) throw new Error('Non autorizzato a registrare pagamenti')
-  const supabase = await createClient()
+  const staff = await richiediStaff()
+  const supabase = await createStaffClient()
   const { data: payment, error } = await supabase
     .from('payments')
     .insert({
@@ -26,7 +25,7 @@ export async function recordPaymentAction(payload: {
       payment_date: payload.payment_date ?? new Date().toISOString().slice(0, 10),
       reference: payload.reference ?? null,
       notes: payload.notes ?? null,
-      created_by: user.id,
+      created_by: staff,
     })
     .select('id')
     .single()
@@ -45,7 +44,7 @@ export async function recordPaymentAction(payload: {
     await supabase.from('ticket_events').insert({
       ticket_id: payload.ticket_id,
       event_type: 'payment_recorded',
-      user_id: user.id,
+      user_id: staff,
       metadata: { payment_id: payment.id, amount: payload.amount, payment_method: payload.payment_method },
     })
   }

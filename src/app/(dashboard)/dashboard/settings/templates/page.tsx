@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -21,7 +21,7 @@ const TEMPLATE_KEYS: TemplateKey[] = [
 
 export default async function SettingsTemplatesPage() {
   await requireRole(canAccessSettings)
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data: rows } = await supabase
     .from('message_templates')
     .select('*')

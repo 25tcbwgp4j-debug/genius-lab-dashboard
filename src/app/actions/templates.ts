@@ -1,8 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 import { canAccessSettings } from '@/lib/auth/rbac'
 
 export async function updateMessageTemplate(
@@ -10,9 +10,8 @@ export async function updateMessageTemplate(
   channel: 'email' | 'whatsapp',
   data: { subject?: string; body?: string; active?: boolean }
 ) {
-  const { profile } = await requireUserAndProfile()
-  if (!canAccessSettings(profile.role)) throw new Error('Non autorizzato a modificare i template')
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
   const { error } = await supabase
     .from('message_templates')
     .update({
@@ -31,9 +30,8 @@ export async function upsertMessageTemplate(
   channel: 'email' | 'whatsapp',
   data: { subject?: string; body: string; active?: boolean }
 ) {
-  const { profile } = await requireUserAndProfile()
-  if (!canAccessSettings(profile.role)) throw new Error('Non autorizzato a modificare i template')
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
   const { error } = await supabase.from('message_templates').upsert(
     {
       template_key: templateKey,

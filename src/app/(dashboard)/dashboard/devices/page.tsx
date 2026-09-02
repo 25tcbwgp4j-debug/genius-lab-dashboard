@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -13,7 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 
 export default async function DevicesPage() {
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data: devices } = await supabase
     .from('devices')
     .select(`

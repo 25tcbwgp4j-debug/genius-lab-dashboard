@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { getLowStockParts } from '@/services/inventory/parts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Ticket, Clock, Package, CheckCircle, AlertCircle } from 'lucide-react'
@@ -7,7 +7,7 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { cn } from '@/lib/utils'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
 
   // 1 query RPC invece di 7 query separate per i contatori
   const [{ data: counts }, lowStockParts] = await Promise.all([

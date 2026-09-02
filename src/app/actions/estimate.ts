@@ -1,8 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 import { canChangeTicketStatus } from '@/lib/auth/rbac'
 
 export type EstimateItem = {
@@ -21,9 +21,8 @@ export async function updateEstimateAction(
     estimate_items?: EstimateItem[] | null
   }
 ) {
-  const { profile } = await requireUserAndProfile()
-  if (!canChangeTicketStatus(profile.role)) throw new Error('Non autorizzato a modificare il ticket')
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
   const labor = Number(payload.estimate_labor_cost) || 0
   const parts = Number(payload.estimate_parts_cost) || 0
   const total = labor + parts

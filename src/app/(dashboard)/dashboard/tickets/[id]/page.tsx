@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,7 +49,7 @@ const Campo = ({ e, v, mono }: { e: string; v?: string | null; mono?: boolean })
 
 export default async function SchedaRiparazione({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data: ticket } = await supabase
     .from('tickets')
     .select(`*,
