@@ -6,6 +6,14 @@ import { requireUserAndProfile } from '@/lib/auth/require-auth'
 import { canChangeTicketStatus } from '@/lib/auth/rbac'
 import { total, estimateText, type EstimateLine } from '@/lib/banco/estimate'
 
+/** Gli unici stati che un filtro può chiedere. */
+const STATI = [
+  'new', 'intake_completed', 'in_diagnosis', 'ai_diagnosis_generated', 'estimate_ready',
+  'waiting_customer_approval', 'approved', 'refused', 'waiting_parts', 'in_repair',
+  'testing', 'ready_for_pickup', 'ready_for_shipping', 'shipped', 'delivered',
+  'unrepaired_returned', 'cancelled',
+]
+
 async function guard() {
   const { profile } = await requireUserAndProfile()
   if (!canChangeTicketStatus(profile.role)) throw new Error('Non autorizzato a modificare il ticket')
@@ -89,9 +97,13 @@ export async function setOfficeOwnerAction(
   return { success: true }
 }
 
-/** Segna una tappa del percorso (arrivo, ricevuta, riparato…). */
+/** Segna una tappa del percorso (arrivo, ricevuta, riparato, consegna…). */
 export async function setMilestoneAction(ticketId: string, field: string, on: boolean) {
-  const consentiti = ['arrived_at', 'pickup_requested_at', 'intake_receipt_sent_at', 'repaired_at']
+  const consentiti = [
+    'arrived_at', 'pickup_requested_at', 'intake_receipt_sent_at', 'repaired_at',
+    'approved_at', 'refused_at', 'ready_for_pickup_at', 'ready_for_shipping_at',
+    'shipped_at', 'delivered_at', 'closed_at',
+  ]
   if (!consentiti.includes(field)) return { error: 'Tappa non riconosciuta' }
   const { supabase } = await guard()
   const { error } = await supabase
@@ -103,9 +115,14 @@ export async function setMilestoneAction(ticketId: string, field: string, on: bo
   return { success: true }
 }
 
+/* PostgREST usa virgole e parentesi come sintassi nei filtri `or`: un termine
+   che le contiene cambierebbe la query. Si tengono solo lettere, cifre e spazi. */
+const pulisci = (t: string) => t.replace(/[^\p{L}\p{N} _-]/gu, '').trim()
+
 /** Cerca fra i preventivi già fatti: più parole = più stretto, come in FileMaker. */
 export async function searchPastEstimatesAction(query: string) {
-  const terms = query.trim().split(/\s+/).filter(Boolean)
+  await requireUserAndProfile()
+  const terms = query.trim().split(/\s+/).map(pulisci).filter(Boolean).slice(0, 6)
   if (!terms.length) return { rows: [] }
   const supabase = await createClient()
   let q = supabase
@@ -124,7 +141,8 @@ export async function searchPastEstimatesAction(query: string) {
 
 /** Le ultime 4 cifre del seriale Apple sono il codice del modello. */
 export async function lookupSerialAction(serial: string) {
-  const s = String(serial || '').trim().toUpperCase()
+  await requireUserAndProfile()
+  const s = String(serial || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (s.length < 11) return { model: null }   // i seriali nuovi a 10 caratteri non dicono nulla
   const supabase = await createClient()
   const { data } = await supabase
@@ -133,4 +151,37 @@ export async function lookupSerialAction(serial: string) {
     .eq('code', s.slice(-4))
     .maybeSingle()
   return { model: data ?? null }
+}
+
+/** Le schede per l'elenco di sinistra: le più recenti, o quelle che rispondono alla ricerca. */
+export async function listaSchedeAction(query: string, filtro: string) {
+  await requireUserAndProfile()
+  const supabase = await createClient()
+  let q = supabase
+    .from('tickets')
+    .select('id, ticket_number, status, office_owner, assigned_technician_id, created_at, customer:customers(first_name, last_name, company_name), device:devices(model, category)')
+    .order('created_at', { ascending: false })
+    .limit(60)
+
+  const t = pulisci(query).slice(0, 40)
+  if (t) q = q.ilike('ticket_number', `%${t}%`)
+  // lo stato arriva da un elenco chiuso: quello che non c'è si ignora
+  if (filtro && filtro !== 'tutte' && STATI.includes(filtro)) q = q.eq('status', filtro)
+
+  const { data, error } = await q
+  if (error) return { rows: [], error: error.message }
+  return { rows: data ?? [] }
+}
+
+/** I contatori in cima all'elenco. */
+export async function contatoriAction() {
+  await requireUserAndProfile()
+  const supabase = await createClient()
+  const stati = ['intake_completed', 'waiting_customer_approval', 'approved', 'in_repair', 'ready_for_pickup', 'new']
+  const out: Record<string, number> = {}
+  await Promise.all(stati.map(async (s) => {
+    const { count } = await supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('status', s)
+    out[s] = count ?? 0
+  }))
+  return out
 }
