@@ -44,8 +44,14 @@ export function BancoPercorso({
   // una scheda già chiusa non deve mostrare tappe mai segnate: sarebbe lavoro
   // da fare che non esiste
   const chiusa = !!dati.delivered_at
+  /* Le schede d'archivio non hanno `arrived_at`: se però una tappa successiva
+     è segnata, il pezzo è arrivato e non va più chiesto. */
+  const avanti = !!(dati.approved_at || dati.repaired_at || dati.ready_for_pickup_at ||
+                    dati.estimate_sent_at || dati.refused_at || chiusa)
   const tappe = PERCORSO.filter((t) => {
-    if (t.k === 'pickup_requested_at') return dati.pickup_requested_at || (!dati.arrived_at && !chiusa)
+    if (t.k === 'pickup_requested_at')
+      return dati.pickup_requested_at || (!dati.arrived_at && !avanti)
+    if (t.k === 'arrived_at') return dati.arrived_at || !avanti
     if (chiusa) return !!dati[t.k]
     return true
   })

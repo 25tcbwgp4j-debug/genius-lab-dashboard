@@ -36,9 +36,15 @@ export function BancoRack({
 
   /* Il passo che tocca adesso. Se manca un presupposto, non si propone niente
      e si dice perché. */
+  /* Sulle schede venute da FileMaker `arrived_at` spesso manca, ma se il
+     preventivo è già partito il pezzo è ovviamente arrivato: non ha senso
+     dire «non è ancora arrivato» su una scheda accettata. */
+  const arrivato = !!(dati.arrived_at || dati.approved_at || dati.repaired_at ||
+                      dati.ready_for_pickup_at || dati.estimate_sent_at || dati.refused_at)
+
   const passo = (() => {
     if (dati.delivered_at) return null
-    if (!dati.arrived_at) return null
+    if (!arrivato) return null
     if (!mappa.has('intake_sent')) return 'intake_sent'
     if (!mappa.has('estimate_sent')) return 'estimate_sent'
     if (dati.refused_at) return null
@@ -49,7 +55,7 @@ export function BancoRack({
 
   const motivo =
     dati.delivered_at ? 'Scheda chiusa.'
-    : !dati.arrived_at ? 'Il dispositivo non è ancora arrivato.'
+    : !arrivato ? 'Il dispositivo non è ancora arrivato.'
     : dati.refused_at ? 'Preventivo rifiutato: resta da restituire il dispositivo.'
     : (dati.approved_at && !dati.repaired_at) ? 'In lavorazione: aspetta il riparato.'
     : null
