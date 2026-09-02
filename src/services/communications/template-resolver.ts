@@ -14,62 +14,68 @@ const DEFAULT_TEMPLATES: Record<
   TemplateKey,
   { email?: { subject: string; body: string }; whatsapp?: string }
 > = {
+  /* Testi copiati dalle mail che Genius Lab manda davvero — 2.495 preventivi,
+     1.989 «pronto per il ritiro», 484 aggiornamenti, 418 consuntivi, letti
+     dalla posta inviata. Il documento sta SEMPRE nel PDF allegato: il corpo
+     resta corto, come lo scrivono loro. Cambiare queste parole significa
+     scrivere ai clienti in un modo che non riconoscono. */
   intake_created: {
     email: {
-      subject: 'Scheda assistenza {{ticket_number}} – Genius Lab',
-      body: 'Gentile {{customer_name}},\n\nLe confermiamo l\'avvenuta registrazione del suo dispositivo.\nNumero riparazione: {{ticket_number}}.\nScheda assistenza (PDF): {{document_intake_link}}\nSegui lo stato: {{tracking_link}}\nContatti: {{shop_phone}}.',
+      subject: 'Scheda assistenza n: {{ticket_number}} - RICEVUTA DI INGRESSO',
+      body: 'Ciao  {{customer_name}}, \n\nin allegato inviamo la RICEVUTA DI INGRESSO relativa alla scheda di assistenza in oggetto.\n\nConservala: ti servirà per il ritiro e per seguire la lavorazione.\n\nRimaniamo in attesa di un Vostro riscontro.\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: 'Gentile {{customer_name}}, scheda assistenza {{ticket_number}}. PDF: {{document_intake_link}} Tracking: {{tracking_link}}. Contatti: {{shop_phone}}',
+    whatsapp: 'Ciao {{customer_name}}, abbiamo preso in carico il tuo dispositivo. Scheda n. {{ticket_number}}. Ti scriviamo appena abbiamo il preventivo.',
   },
   estimate_ready: {
     email: {
-      subject: 'Preventivo riparazione {{ticket_number}} – Genius Lab',
-      body: 'Gentile {{customer_name}},\n\nIl preventivo per la riparazione {{ticket_number}} è pronto. Totale: {{amount_due}} €. Approvazione: {{estimate_link}}. Per informazioni: {{shop_phone}}.',
+      subject: 'Scheda assistenza n: {{ticket_number}} - PREVENTIVO',
+      body: 'Ciao  {{customer_name}}, \n\nin allegato inviamo il PREVENTIVO relativo alla scheda di assistenza in oggetto.\n\nRimaniamo in attesa di un Vostro riscontro.\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: 'Preventivo {{ticket_number}} pronto. Totale {{amount_due}} €. Approva o rifiuta: {{estimate_link}}',
+    whatsapp: 'Ciao {{customer_name}}, in allegato il PREVENTIVO della scheda n. {{ticket_number}}. Rimaniamo in attesa di un Vostro riscontro.',
   },
   repair_update: {
     email: {
-      subject: 'Aggiornamento riparazione {{ticket_number}}',
-      body: 'Gentile {{customer_name}},\n\nStato riparazione {{ticket_number}}: {{status}}. Tracciamento: {{tracking_link}}.',
+      subject: 'Scheda assistenza n: {{ticket_number}} - AGGIORNAMENTO',
+      body: 'Ciao  {{customer_name}}, \n\nin allegato inviamo l\u2019AGGIORNAMENTO  relativo alla scheda di assistenza in oggetto.\n\nRimaniamo in attesa di un Vostro riscontro.\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: '{{ticket_number}}: {{status}}. {{tracking_link}}',
+    whatsapp: 'Ciao {{customer_name}}, aggiornamento sulla scheda n. {{ticket_number}}.',
   },
   ready_for_pickup: {
     email: {
-      subject: 'Dispositivo pronto per il ritiro – {{ticket_number}}',
-      body: 'Gentile {{customer_name}},\n\nIl suo dispositivo è pronto per il ritiro. Importo da saldare: {{amount_due}} €. Orari: {{working_hours}}. Contatti: {{shop_phone}}.',
+      subject: 'Scheda assistenza n: {{ticket_number}} PRONTO PER IL RITIRO',
+      body: 'Ciao  {{customer_name}}, \n\nDISPOSITIVO PRONTO PER IL RITIRO presso: \n\nViale Somalia, 244  246  248  - Roma\nOrario LUN-VEN 9:30-13.30 e 15.00-19.00\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: 'Dispositivo pronto per ritiro. Importo: {{amount_due}} €. Orari: {{working_hours}}. {{shop_phone}}',
+    whatsapp: 'Ciao {{customer_name}}, il dispositivo della scheda n. {{ticket_number}} è PRONTO PER IL RITIRO in Viale Somalia 244/246/248, Roma. Orario LUN-VEN 9:30-13:30 e 15:00-19:00.',
   },
   ready_for_shipping: {
     email: {
-      subject: 'Riparazione completata – Pronto per spedizione {{ticket_number}}',
-      body: 'Gentile {{customer_name}},\n\nRiparazione {{ticket_number}} completata. Totale: {{amount_due}} €. Istruzioni pagamento: {{payment_instructions}}. Dopo l\'accredito spediremo il dispositivo.',
+      subject: 'Scheda assistenza n: {{ticket_number}} - PAGAMENTO E SPEDIZIONE',
+      body: 'Ciao {{customer_name}} \n\nin allegato inviamo il CONSUNTIVO relativo alla scheda di assistenza in oggetto.\n\nPagamento con BONIFICO ORDINARIO (spedizione dopo 1 giorno lavorativo per accredito):\n\nPagamento con BONIFICO ISTANTANEO (spedizione immediata) avvertire dopo aver fatto bonifico:\n\nGENIUS LAB s.r.l.s.\nIBAN: {{iban}}\nBIC/SWIFT: SUMUIE22XXX\nIstituto: SumUp Limited\nPaese della banca: IRLANDA\n\nSe la banca chiede il paese dell\u2019istituto indicare IRLANDA e non Italia: indicando Italia il bonifico viene respinto.\n\nImporto \u20ac. {{amount_due}}\n\nCAUSALE:Scheda Assistenza N. {{ticket_number}}\n\nSe necessita fattura rispondere a questa mail con i dati per la fatturazione contestualmente al pagamento\n\nRimaniamo in attesa di un Vostro riscontro\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: 'Riparazione completata. Totale {{amount_due}} €. Istruzioni: {{iban}} – Causale GL {{ticket_number}}',
+    whatsapp: 'Ciao {{customer_name}}, consuntivo della scheda n. {{ticket_number}}: {{amount_due}} \u20ac. IBAN {{iban}} (SumUp Limited, paese IRLANDA). Causale: Scheda Assistenza N. {{ticket_number}}.',
   },
   payment_instructions: {
     email: {
-      subject: 'Istruzioni di pagamento – {{ticket_number}}',
-      body: 'Gentile {{customer_name}},\n\nImporto da saldare: {{amount_due}} €.\nIBAN: {{iban}}\nIntestatario: {{beneficiary}}\nRiferimento (causale): {{payment_reference}}\n\nDopo il pagamento: {{proof_of_payment_instructions}}',
+      subject: 'Scheda assistenza n: {{ticket_number}} - PAGAMENTO E PRONTO PER IL RITIRO',
+      body: 'Ciao {{customer_name}} \n\nin allegato inviamo il CONSUNTIVO relativo alla scheda di assistenza in oggetto.\n\nGENIUS LAB s.r.l.s.\nIBAN: {{iban}}\nBIC/SWIFT: SUMUIE22XXX\nIstituto: SumUp Limited\nPaese della banca: IRLANDA\n\nSe la banca chiede il paese dell\u2019istituto indicare IRLANDA e non Italia: indicando Italia il bonifico viene respinto.\n\nImporto \u20ac. {{amount_due}}\n\nCAUSALE:Scheda Assistenza N. {{ticket_number}}\n\nDISPOSITIVO PRONTO PER IL RITIRO presso: \n\nViale Somalia, 244  246  248  - Roma\nOrario LUN-VEN 9:30-13.30 e 15.00-19.00\n\nSe necessita fattura rispondere a questa mail con i dati per la fatturazione contestualmente al pagamento\n\nRimaniamo in attesa di un Vostro riscontro\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: 'Pagamento {{ticket_number}}: {{amount_due}} €. IBAN: {{iban}}. Intestatario: {{beneficiary}}. Causale: {{payment_reference}}. Dopo il bonifico: {{proof_of_payment_instructions}}',
+    whatsapp: 'Ciao {{customer_name}}, scheda n. {{ticket_number}}: {{amount_due}} \u20ac. IBAN {{iban}} (SumUp Limited, paese IRLANDA). Causale: Scheda Assistenza N. {{ticket_number}}. Poi il dispositivo è pronto per il ritiro.',
   },
   shipped: {
     email: {
-      subject: 'Dispositivo spedito – {{ticket_number}}',
-      body: 'Gentile {{customer_name}},\n\nIl suo dispositivo (riparazione {{ticket_number}}) è stato spedito.\nCorriere: {{courier_name}}\nCodice tracciamento: {{tracking_code}}\n\nSegui la spedizione: {{tracking_link}}',
+      subject: 'Scheda assistenza n: {{ticket_number}} - SPEDITO',
+      body: 'Ciao  {{customer_name}}, \n\nil dispositivo della scheda di assistenza in oggetto \u00e8 stato SPEDITO.\n\nCorriere: {{courier}}\nNumero di tracking: {{tracking_code}}\n\nRimaniamo in attesa di un Vostro riscontro.\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: 'Dispositivo {{ticket_number}} spedito. Corriere: {{courier_name}}. Tracciamento: {{tracking_code}}. {{tracking_link}}',
+    whatsapp: 'Ciao {{customer_name}}, la scheda n. {{ticket_number}} \u00e8 stata spedita. {{courier}} \u2014 tracking {{tracking_code}}.',
   },
   ticket_closed: {
     email: {
-      subject: 'Riparazione conclusa – {{ticket_number}}',
-      body: 'Gentile {{customer_name}},\n\nLa riparazione {{ticket_number}} è stata conclusa. Grazie per aver scelto Genius Lab.',
+      subject: 'Scheda assistenza n: {{ticket_number}} - CONSEGNATO',
+      body: 'Ciao  {{customer_name}}, \n\nla lavorazione relativa alla scheda di assistenza in oggetto \u00e8 conclusa e il dispositivo \u00e8 stato consegnato.\n\nGrazie per averci scelto.\n\nCordialmente,\n\nApple  Vendita - Assistenza\n\nGenius Lab\nViale Somalia, 244/246/248\n00199 Roma\nTel. +39 06 84385510\nTel. +39 06 80074880\nOrario LUN-VEN orario 9:30-13.30 e 15.00-19.00\n\nwww.avatech.info\n\nwww.assistenza-macbook.it\nwww.apple-assistenza.it\nhttps://www.ebay.it/str/avatechlab',
     },
-    whatsapp: 'Riparazione {{ticket_number}} conclusa. Grazie da Genius Lab.',
+    whatsapp: 'Ciao {{customer_name}}, la scheda n. {{ticket_number}} è chiusa. Grazie per averci scelto.',
   },
+
 }
 
 /** Dynamic parameter injection: replace {{key}} with payload[key]. Keys and values must be server-built only. */
