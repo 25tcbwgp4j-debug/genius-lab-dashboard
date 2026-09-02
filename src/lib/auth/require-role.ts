@@ -11,13 +11,18 @@ import type { AppRole } from '@/types/database'
  * Comunicazioni, Impostazioni e Modelli messaggi **rimandavano al login** anche
  * a chi era già entrato. Quattro sezioni irraggiungibili.
  *
- * Chi ha la password è staff, e lo staff vede tutto: il ruolo si dà per admin.
- * Il parametro resta per non toccare le pagine che lo passano.
+ * ⚠️ Il predicato sui ruoli viene IGNORATO di proposito, ed è una scelta da
+ * conoscere: la dashboard ha **una sola password per tutto lo staff**, quindi
+ * non esistono livelli da distinguere — chi entra è già dentro a tutto, e il
+ * muro vero è il proxy. Far finta di filtrare per ruolo darebbe una falsa
+ * sicurezza; peggio, com'era prima, rendeva quattro sezioni irraggiungibili.
+ * Se un domani si vorranno ruoli diversi servirà un accesso per persona
+ * (Supabase Auth o utenze separate): allora questo controllo va rifatto.
  */
 export async function requireRole(
   _allowed?: (role: AppRole) => boolean
 ): Promise<{ role: AppRole }> {
-  const secret = process.env.AUTH_SECRET || ''
+  const secret = process.env.AUTH_SECRET?.trim() || ''
   const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value
   if (!secret || !token || !(await verifyToken(token, secret))) redirect('/login')
   return { role: 'admin' as AppRole }

@@ -6,7 +6,7 @@ import type { TemplateKey } from '@/services/communications/template-resolver'
 
 // Auth password-based: check cookie HMAC invece di Supabase Auth
 async function isAuthenticated(): Promise<boolean> {
-  const secret = process.env.AUTH_SECRET || ''
+  const secret = process.env.AUTH_SECRET?.trim() || ''
   if (!secret) return false
   const cookieStore = await cookies()
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value

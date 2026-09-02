@@ -15,7 +15,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 let idInCache: string | null = null
 
 export async function richiediStaff(): Promise<string> {
-  const secret = process.env.AUTH_SECRET || ''
+  const secret = process.env.AUTH_SECRET?.trim() || ''
   if (!secret) throw new Error('Accesso non configurato')
   const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value
   if (!token || !(await verifyToken(token, secret))) throw new Error('Non autenticato')

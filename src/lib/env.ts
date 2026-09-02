@@ -4,8 +4,17 @@
  * Required at runtime: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
  */
 
+/**
+ * Alcune variabili su Vercel portano un a-capo finale — `NEXT_PUBLIC_SUPABASE_URL`,
+ * `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL` e altre. Un indirizzo mittente che finisce
+ * con «\n» non è un indirizzo valido: Resend rifiuta il messaggio e le mail non
+ * partono. Un URL così rompe ogni link. Si ripulisce qui, una volta per tutte.
+ */
 function get(key: string): string | undefined {
-  return process.env[key]
+  const v = process.env[key]
+  if (v === undefined) return undefined
+  const pulito = v.trim()
+  return pulito === '' ? undefined : pulito
 }
 
 /** Public app URL (no trailing slash). Used in links in emails, PDFs, tracking. */
