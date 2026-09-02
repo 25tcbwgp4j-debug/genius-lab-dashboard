@@ -20,8 +20,23 @@ export default async function InventoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Magazzino</h1>
-        <p className="text-muted-foreground">Ricambi e parti</p>
+        <h1 className="text-2xl font-bold tracking-tight">Ricambi</h1>
+        <p className="text-muted-foreground">Scorte e disponibilità</p>
+      </div>
+
+      {/* Questi 153 articoli sono stati caricati in due giorni a marzo 2026 e non
+          sono mai stati usati: zero movimenti, zero ricambi impegnati su una
+          riparazione. I prezzi non vengono da nessun preventivo reale. */}
+      <div className="rounded-md border border-l-[3px] border-l-amber-500 bg-amber-50/60 px-4 py-3 text-sm">
+        <p className="font-medium text-amber-900">Questi prezzi non sono verificati</p>
+        <p className="mt-1 leading-relaxed text-amber-800">
+          I 153 articoli sono stati caricati in prova a marzo 2026 e da allora non è mai
+          stato registrato un movimento né impegnato un ricambio su una riparazione.
+          Gli importi non corrispondono a nessun preventivo realmente fatto.
+          <br />
+          <b>I preventivi non li usano:</b> i prezzi delle lavorazioni vengono dal listino
+          e dall’archivio dei 6.688 preventivi accettati, non da qui.
+        </p>
       </div>
       {lowStock.length > 0 && (
         <Card className="border-amber-200 bg-amber-50/50">
