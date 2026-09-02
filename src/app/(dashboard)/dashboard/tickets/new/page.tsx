@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -12,7 +12,7 @@ export default async function NewTicketPage({
   searchParams: Promise<{ customerId?: string; deviceId?: string }>
 }) {
   const { customerId, deviceId } = await searchParams
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data: customers } = await supabase.from('customers').select('id, first_name, last_name, phone').order('last_name')
   let devices: { id: string; model: string; category: string; customer_id: string }[] = []
   if (customerId) {

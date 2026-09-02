@@ -1,14 +1,13 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
 import { runAIDiagnosis } from '@/services/ai-diagnosis/run-diagnosis'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 import { canUseAIDiagnosis, canEditDiagnosis } from '@/lib/auth/rbac'
 
 export async function generateAIDiagnosisAction(ticketId: string) {
-  const { profile } = await requireUserAndProfile()
-  if (!canUseAIDiagnosis(profile.role)) throw new Error('Non autorizzato a usare la diagnosi AI')
+  await richiediStaff()
   // runAIDiagnosis already inserts ticket_event 'ai_diagnosis_generated' and logs; no duplicate event.
   const result = await runAIDiagnosis(ticketId)
   revalidatePath(`/dashboard/tickets/${ticketId}`)
@@ -17,9 +16,8 @@ export async function generateAIDiagnosisAction(ticketId: string) {
 
 /** Append AI suggestion to technician diagnosis notes. NEVER overwrites tickets.diagnosis — only appends. */
 export async function acceptAIDiagnosisSuggestionAction(ticketId: string, suggestionText: string) {
-  const { profile } = await requireUserAndProfile()
-  if (!canEditDiagnosis(profile.role)) throw new Error('Non autorizzato a modificare la diagnosi')
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
   const { data: ticket } = await supabase.from('tickets').select('diagnosis').eq('id', ticketId).single()
   if (!ticket) return { error: 'Ticket non trovato' }
   const existing = (ticket.diagnosis ?? '').trim()
@@ -32,9 +30,8 @@ export async function acceptAIDiagnosisSuggestionAction(ticketId: string, sugges
 
 /** Discard AI suggestion: clear ai_* fields on ticket; keep ticket_ai_diagnosis rows for history. */
 export async function discardAIDiagnosisSuggestionAction(ticketId: string) {
-  const { profile } = await requireUserAndProfile()
-  if (!canEditDiagnosis(profile.role)) throw new Error('Non autorizzato a modificare la diagnosi')
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
   await supabase
     .from('tickets')
     .update({

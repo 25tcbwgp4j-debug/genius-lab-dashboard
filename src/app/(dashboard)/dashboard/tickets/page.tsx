@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { cn } from '@/lib/utils'
@@ -21,7 +21,7 @@ export default async function TicketsPage({
   searchParams: Promise<{ status?: string }>
 }) {
   const { status } = await searchParams
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   let query = supabase
     .from('tickets')
     .select(`

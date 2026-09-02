@@ -1,13 +1,13 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 
 export async function addOperatorAction(name: string) {
-  await requireUserAndProfile()
+  await richiediStaff()
   if (!name.trim()) return { error: 'Nome richiesto' }
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { error } = await supabase.from('operators').insert({ name: name.trim().toUpperCase() })
   if (error) {
     if (error.code === '23505') return { error: 'Operatore già esistente' }
@@ -18,8 +18,8 @@ export async function addOperatorAction(name: string) {
 }
 
 export async function removeOperatorAction(id: string) {
-  await requireUserAndProfile()
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
   const { error } = await supabase.from('operators').delete().eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/dashboard/settings')
@@ -27,8 +27,8 @@ export async function removeOperatorAction(id: string) {
 }
 
 export async function toggleOperatorAction(id: string, active: boolean) {
-  await requireUserAndProfile()
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
   const { error } = await supabase.from('operators').update({ active }).eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/dashboard/settings')

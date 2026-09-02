@@ -1,13 +1,13 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 
 export async function deleteDeviceAction(deviceId: string) {
-  await requireUserAndProfile()
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
 
   // Verifica se ci sono ticket collegati (FK ON DELETE RESTRICT bloccherebbe)
   const { data: tickets } = await supabase

@@ -1,18 +1,17 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { customerCreateSchema, customerUpdateSchema, type CustomerCreateInput, type CustomerUpdateInput } from '@/lib/validations/customer'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 import { canAccessCustomers } from '@/lib/auth/rbac'
 
 export async function createCustomer(formData: CustomerCreateInput) {
-  const { profile } = await requireUserAndProfile()
-  if (!canAccessCustomers(profile.role)) throw new Error('Non autorizzato a creare clienti')
+  await richiediStaff()
   const parsed = customerCreateSchema.safeParse(formData)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data, error } = await supabase
     .from('customers')
     .insert({
@@ -28,11 +27,10 @@ export async function createCustomer(formData: CustomerCreateInput) {
 }
 
 export async function updateCustomer(id: string, formData: CustomerUpdateInput) {
-  const { profile } = await requireUserAndProfile()
-  if (!canAccessCustomers(profile.role)) throw new Error('Non autorizzato a modificare i clienti')
+  await richiediStaff()
   const parsed = customerUpdateSchema.safeParse(formData)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { error } = await supabase.from('customers').update(parsed.data).eq('id', id)
   if (error) return { error: { _form: [error.message] } }
   revalidatePath('/dashboard/customers')

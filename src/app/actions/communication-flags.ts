@@ -1,12 +1,12 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
-import { requireUserAndProfile } from '@/lib/auth/require-auth'
+import { richiediStaff } from '@/lib/auth/staff'
 
 export async function toggleCommunicationFlag(ticketId: string, flagType: string) {
-  const { user } = await requireUserAndProfile()
-  const supabase = await createClient()
+  await richiediStaff()
+  const supabase = await createStaffClient()
 
   // Controlla se il flag esiste già
   const { data: existing } = await supabase
@@ -24,7 +24,7 @@ export async function toggleCommunicationFlag(ticketId: string, flagType: string
     await supabase.from('communication_flags').insert({
       ticket_id: ticketId,
       flag_type: flagType,
-      sent_by: user.id,
+      sent_by: null,
       sent_at: new Date().toISOString(),
     })
   }

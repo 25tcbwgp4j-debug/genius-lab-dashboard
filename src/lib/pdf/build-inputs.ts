@@ -3,11 +3,11 @@
  * When called from public document API (token-only), pass admin client to bypass RLS.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { IntakePdfInput, EstimatePdfInput, PaymentInstructionsPdfInput, FinalReportPdfInput } from './types'
 
 async function getClient(supabase?: SupabaseClient) {
-  return supabase ?? await createClient()
+  return supabase ?? createAdminClient()
 }
 
 export async function buildIntakePdfInput(ticketId: string, supabase?: SupabaseClient): Promise<IntakePdfInput | null> {

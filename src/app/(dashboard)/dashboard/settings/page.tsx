@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -8,7 +8,7 @@ import { OperatorsManager } from '@/components/settings/operators-manager'
 
 export default async function SettingsPage() {
   await requireRole(canAccessSettings)
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data: settings } = await supabase.from('company_settings').select('*').limit(1).maybeSingle()
   const { data: operators } = await supabase.from('operators').select('id, name, active').order('name')
 

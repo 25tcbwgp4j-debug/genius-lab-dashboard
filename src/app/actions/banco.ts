@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
 import { richiediStaff } from '@/lib/auth/staff'
 import { total, estimateText, type EstimateLine } from '@/lib/banco/estimate'
@@ -15,7 +15,7 @@ const STATI = [
 
 async function guard() {
   await richiediStaff()
-  return { supabase: await createClient() }
+  return { supabase: await createStaffClient() }
 }
 const refresh = (id: string) => {
   revalidatePath(`/dashboard/tickets/${id}`)
@@ -97,13 +97,13 @@ export async function setOfficeOwnerAction(
 
 /** Segna una tappa del percorso (arrivo, ricevuta, riparato, consegna…). */
 export async function setMilestoneAction(ticketId: string, field: string, on: boolean) {
+  const { supabase } = await guard()
   const consentiti = [
     'arrived_at', 'pickup_requested_at', 'intake_receipt_sent_at', 'repaired_at',
     'approved_at', 'refused_at', 'ready_for_pickup_at', 'ready_for_shipping_at',
     'shipped_at', 'delivered_at', 'closed_at',
   ]
   if (!consentiti.includes(field)) return { error: 'Tappa non riconosciuta' }
-  const { supabase } = await guard()
   const { error } = await supabase
     .from('tickets')
     .update({ [field]: on ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
@@ -122,7 +122,7 @@ export async function searchPastEstimatesAction(query: string) {
   await richiediStaff()
   const terms = query.trim().split(/\s+/).map(pulisci).filter(Boolean).slice(0, 6)
   if (!terms.length) return { rows: [] }
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   let q = supabase
     .from('past_estimates')
     .select('card_no, model, family, fault, body, price, year, month')
@@ -142,7 +142,7 @@ export async function lookupSerialAction(serial: string) {
   await richiediStaff()
   const s = String(serial || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (s.length < 11) return { model: null }   // i seriali nuovi a 10 caratteri non dicono nulla
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data } = await supabase
     .from('serial_models')
     .select('model, family, seen')
@@ -154,7 +154,7 @@ export async function lookupSerialAction(serial: string) {
 /** Le schede per l'elenco di sinistra: le più recenti, o quelle che rispondono alla ricerca. */
 export async function listaSchedeAction(query: string, filtro: string) {
   await richiediStaff()
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   let q = supabase
     .from('tickets')
     .select('id, ticket_number, status, office_owner, assigned_technician_id, created_at, customer:customers(first_name, last_name, company_name), device:devices(model, category)')
@@ -174,7 +174,7 @@ export async function listaSchedeAction(query: string, filtro: string) {
 /** I contatori in cima all'elenco. */
 export async function contatoriAction() {
   await richiediStaff()
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const stati = ['intake_completed', 'waiting_customer_approval', 'approved', 'in_repair', 'ready_for_pickup', 'new']
   const out: Record<string, number> = {}
   await Promise.all(stati.map(async (s) => {

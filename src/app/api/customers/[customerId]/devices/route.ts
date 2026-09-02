@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth-password'
@@ -22,7 +22,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const { customerId } = await params
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data, error } = await supabase
     .from('devices')
     .select('id, model, category, customer_id')

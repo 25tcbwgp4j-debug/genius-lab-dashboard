@@ -1,5 +1,5 @@
 import React from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { createStaffClient } from '@/lib/supabase/staff'
 import Link from 'next/link'
 import { requireRole } from '@/lib/auth/require-role'
 import { canAccessCommunications } from '@/lib/auth/rbac'
@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 
 export default async function CommunicationsPage() {
   await requireRole(canAccessCommunications)
-  const supabase = await createClient()
+  const supabase = await createStaffClient()
   const { data: comms } = await supabase
     .from('communications')
     .select(`
