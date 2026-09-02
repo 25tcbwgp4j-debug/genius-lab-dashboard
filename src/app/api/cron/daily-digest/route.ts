@@ -49,7 +49,7 @@ const OPEN_STATUSES = [
 ]
 
 function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
+  const secret = process.env.CRON_SECRET?.trim()
   if (!secret) return false
   const auth = request.headers.get('authorization') || ''
   return auth === `Bearer ${secret}`
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const recipient = process.env.DIGEST_RECIPIENT_EMAIL
+  const recipient = process.env.DIGEST_RECIPIENT_EMAIL?.trim()
   if (!recipient) {
     return NextResponse.json(
       { skipped: true, reason: 'DIGEST_RECIPIENT_EMAIL non configurata' },
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
     .limit(50)
   if (err2) return NextResponse.json({ error: err2.message }, { status: 500 })
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://genius-lab-dashboard.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://genius-lab-dashboard.vercel.app'
   const today = new Date().toLocaleDateString('it-IT')
 
   const countsRows = Object.entries(counts)

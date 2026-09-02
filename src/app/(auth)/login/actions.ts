@@ -17,8 +17,8 @@ export async function login(formData: FormData) {
   const from =
     fromRaw.startsWith("/") && !fromRaw.startsWith("//") ? fromRaw : "/dashboard";
 
-  const expected = process.env.DASHBOARD_PASSWORD || "";
-  const secret = process.env.AUTH_SECRET || "";
+  const expected = process.env.DASHBOARD_PASSWORD?.trim() || "";
+  const secret = process.env.AUTH_SECRET?.trim() || "";
 
   if (!expected || !secret) {
     redirect("/login?error=not_configured");

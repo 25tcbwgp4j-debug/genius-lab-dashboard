@@ -6,7 +6,7 @@ import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth-password'
 // API protetta dal proxy password-based. Check extra del cookie qui per
 // hardening (in caso l'API venga chiamata da contesti senza proxy).
 async function isAuthenticated(): Promise<boolean> {
-  const secret = process.env.AUTH_SECRET || ''
+  const secret = process.env.AUTH_SECRET?.trim() || ''
   if (!secret) return false
   const cookieStore = await cookies()
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value

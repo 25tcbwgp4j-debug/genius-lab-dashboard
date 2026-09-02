@@ -17,7 +17,7 @@ import type { AppRole } from '@/types/database'
 export async function requireRole(
   _allowed?: (role: AppRole) => boolean
 ): Promise<{ role: AppRole }> {
-  const secret = process.env.AUTH_SECRET || ''
+  const secret = process.env.AUTH_SECRET?.trim() || ''
   const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value
   if (!secret || !token || !(await verifyToken(token, secret))) redirect('/login')
   return { role: 'admin' as AppRole }
