@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'endpoint, p256dh, auth richiesti' }, { status: 400 })
   }
 
-  const chatbotUrl = process.env.CHATBOT_BACKEND_URL
-  const apiKey = process.env.CHATBOT_API_KEY ?? ''
+  const chatbotUrl = process.env.CHATBOT_BACKEND_URL?.trim()
+  const apiKey = process.env.CHATBOT_API_KEY?.trim() ?? ''
   if (!chatbotUrl) return NextResponse.json({ error: 'Backend non configurato' }, { status: 500 })
 
   const res = await fetch(`${chatbotUrl}/api/chat/push/subscribe`, {

@@ -63,8 +63,13 @@ export async function GET(
     intake: 'scheda-ingresso', estimate: 'preventivo',
     payment: 'consuntivo', report: 'rapporto',
   }
-  const filename = (t: string) =>
-    `${ticket.ticket_number ?? token.slice(0, 8)} ${nomi[t] ?? t}.pdf`
+  // il nome finisce dentro un header HTTP: si tengono solo lettere, cifre,
+  // spazi e trattini, così non ci si può infilare altro
+  const pulito = String(ticket.ticket_number ?? token.slice(0, 8))
+    .replace(/[^A-Za-z0-9 _-]/g, '')
+    .slice(0, 40)
+    .trim() || token.slice(0, 8)
+  const filename = (t: string) => `${pulito} ${nomi[t] ?? t}.pdf`
   try {
     switch (type as DocumentType) {
       case 'intake': {

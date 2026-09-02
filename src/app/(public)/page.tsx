@@ -4,7 +4,7 @@ import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth-password'
 
 export default async function HomePage() {
   // Check cookie HMAC per decidere se mostrare "Vai alla dashboard" o "Accedi"
-  const secret = process.env.AUTH_SECRET || ''
+  const secret = process.env.AUTH_SECRET?.trim() || ''
   let isLoggedIn = false
   if (secret) {
     const cookieStore = await cookies()

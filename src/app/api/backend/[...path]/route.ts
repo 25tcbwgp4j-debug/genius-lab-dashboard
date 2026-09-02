@@ -11,11 +11,11 @@ import { NextRequest, NextResponse } from "next/server";
  */
 
 const BACKEND_URL =
-  process.env.BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.BACKEND_URL?.trim() ||
+  process.env.NEXT_PUBLIC_API_URL?.trim() ||
   "https://chatbot-backend-production-fa39.up.railway.app";
 
-const API_KEY = process.env.API_KEY || "";
+const API_KEY = process.env.API_KEY?.trim() || "";
 
 // Headers della richiesta originale che inoltriamo al backend
 const FORWARDED_REQ_HEADERS = new Set([
