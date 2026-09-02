@@ -204,6 +204,7 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
           priceList={priceList ?? []}
           pairs={(estimatePairs ?? []) as never}
           searchHint={cercaSimili}
+          modello={dev?.model ?? ''}
           prezzi={(prezziDispositivo ?? []).filter(
             (r: { family: string }) => r.family === famiglia
           )}
