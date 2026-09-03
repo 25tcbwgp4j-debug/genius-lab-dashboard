@@ -358,6 +358,27 @@ export async function cercaClienteAction(q: string) {
     .select('id, first_name, last_name, company_name, phone, email')
     .or(filtro)
     .limit(8)
+
+  // al banco si cerca anche col seriale del pezzo che ci avevano già portato
+  if ((data ?? []).length === 0 && /^[A-Za-z0-9]{8,}$/.test(t)) {
+    const { data: perSeriale } = await supabase
+      .from('devices')
+      .select('customer:customers(id, first_name, last_name, company_name, phone, email)')
+      .ilike('serial_number', `%${t}%`)
+      .limit(5)
+    const clienti = (perSeriale ?? [])
+      .map((r: { customer: unknown }) => r.customer)
+      .filter(Boolean)
+    const visti = new Set<string>()
+    return {
+      clienti: clienti.filter((c) => {
+        const id = (c as { id: string }).id
+        if (visti.has(id)) return false
+        visti.add(id); return true
+      }),
+      daSeriale: true,
+    }
+  }
   return { clienti: data ?? [] }
 }
 
@@ -479,4 +500,87 @@ export async function creaSchedaAction(d: {
 
   revalidatePath('/dashboard/tickets')
   return { success: true, id: scheda.id, numero: scheda.ticket_number }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Duplicare una scheda.
+
+   È il modo in cui si apre una riparazione a un cliente che è già stato qui:
+   si cerca la sua ultima scheda — per telefono, nome o numero di serie — e la
+   si duplica. Se torna con lo STESSO dispositivo si tiene tutto e si azzerano
+   difetto, preventivo e date, e si scrive il nuovo guasto. Se porta un altro
+   dispositivo si tiene l'anagrafica e si cambiano i dati dell'apparecchio.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export async function duplicaSchedaAction(ticketId: string, stessoDispositivo: boolean) {
+  await richiediStaff()
+  const staff = await richiediStaff()
+  const supabase = await createStaffClient()
+
+  const { data: vecchia } = await supabase
+    .from('tickets')
+    .select('id, ticket_number, customer_id, device_id, shipping_required, shipping_address, recipient_name, recipient_phone, device:devices(model, category, serial_number, device_password, apple_id, apple_id_password)')
+    .eq('id', ticketId)
+    .single()
+  if (!vecchia) return { error: 'Scheda non trovata' }
+
+  // la join torna un array anche quando la riga è una sola
+  type Disp = {
+    model: string; category: string; serial_number: string | null
+    device_password: string | null; apple_id: string | null; apple_id_password: string | null
+  }
+  const grezzo = vecchia.device as unknown
+  const d: Disp | null = Array.isArray(grezzo) ? (grezzo[0] as Disp ?? null) : (grezzo as Disp | null)
+
+  // stesso dispositivo: si ricopia com'era, ma senza il difetto della volta scorsa.
+  // dispositivo nuovo: resta solo il cliente, il resto si compila sulla scheda.
+  const { data: disp, error: eD } = await supabase
+    .from('devices')
+    .insert({
+      customer_id: vecchia.customer_id,
+      category: stessoDispositivo ? (d?.category ?? 'other') : 'other',
+      model: stessoDispositivo ? (d?.model ?? 'Non indicato') : 'Da indicare',
+      serial_number: stessoDispositivo ? d?.serial_number ?? null : null,
+      device_password: stessoDispositivo ? d?.device_password ?? null : null,
+      apple_id: stessoDispositivo ? d?.apple_id ?? null : null,
+      apple_id_password: stessoDispositivo ? d?.apple_id_password ?? null : null,
+      customer_reported_issue: null,          // il difetto è quello nuovo, si scrive ora
+      special_notes: `duplicata dalla scheda n. ${vecchia.ticket_number}`,
+    })
+    .select('id')
+    .single()
+  if (eD) return { error: `Dispositivo non creato: ${eD.message}` }
+
+  const numero = await getNextTicketNumber()
+  const { data: nuova, error: eT } = await supabase
+    .from('tickets')
+    .insert({
+      ticket_number: numero,
+      customer_id: vecchia.customer_id,
+      device_id: disp.id,
+      created_by_user_id: staff,
+      status: 'intake_completed',
+      priority: 'normal',
+      // niente difetto, niente preventivo, niente date: sono di quella volta
+      intake_summary: null,
+      estimate_lines: [],
+      estimate_notes: null,
+      total_amount: 0,
+      estimate_parts_cost: 0,
+      estimate_labor_cost: 0,
+      work_log: [],
+      arrived_at: new Date().toISOString(),
+      // le abitudini del cliente invece restano: dove spedire, a chi
+      shipping_required: vecchia.shipping_required ?? false,
+      shipping_address: vecchia.shipping_address ?? null,
+      recipient_name: vecchia.recipient_name ?? null,
+      recipient_phone: vecchia.recipient_phone ?? null,
+      public_tracking_token: crypto.randomUUID().replace(/-/g, ''),
+    })
+    .select('id, ticket_number')
+    .single()
+  if (eT) return { error: `Scheda non creata: ${eT.message}` }
+
+  revalidatePath('/dashboard/tickets')
+  return { success: true, id: nuova.id, numero: nuova.ticket_number, stessoDispositivo }
 }

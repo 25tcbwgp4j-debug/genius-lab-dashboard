@@ -15,6 +15,7 @@ import { TicketAcceptanceOperator } from '@/components/tickets/ticket-acceptance
 import { BancoPercorso } from '@/components/tickets/banco-percorso'
 import { BancoRack } from '@/components/tickets/banco-rack'
 import { BancoElenco } from '@/components/tickets/banco-elenco'
+import { DuplicaScheda } from '@/components/tickets/duplica-scheda'
 import type { TicketStatus } from '@/types/database'
 
 /**
@@ -161,7 +162,10 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
           <span className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide ${COLORE(ticket.status)}`}>
             {ETICHETTA[ticket.status as TicketStatus] ?? ticket.status}
           </span>
-          <span className="ml-auto"><TicketActions ticketId={id} currentStatus={ticket.status as TicketStatus} /></span>
+          <span className="ml-auto flex items-center gap-2">
+            <DuplicaScheda ticketId={id} modello={dev?.model ?? ''} />
+            <TicketActions ticketId={id} currentStatus={ticket.status as TicketStatus} />
+          </span>
         </div>
 
         <Card>
