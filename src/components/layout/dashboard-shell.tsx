@@ -45,12 +45,15 @@ const navItems: { href: string; label: string; icon: React.ElementType; can: (r:
 
   { href: '/dashboard/customers', label: 'Clienti', icon: Users, can: canAccessCustomers, gruppo: 'Anagrafiche' },
   { href: '/dashboard/devices', label: 'Dispositivi', icon: Smartphone, can: canAccessDevices, gruppo: 'Anagrafiche' },
-  { href: '/dashboard/inventory', label: 'Ricambi', icon: Package, can: canManageInventory, gruppo: 'Anagrafiche' },
 
   { href: '/dashboard/payments', label: 'Incassi', icon: Wallet, can: canViewPayments, gruppo: 'Soldi e messaggi' },
   { href: '/dashboard/chat', label: 'WhatsApp', icon: MessageCircle, can: () => true, gruppo: 'Soldi e messaggi' },
   { href: '/dashboard/communications', label: 'Mail inviate', icon: MessageSquare, can: canAccessCommunications, gruppo: 'Soldi e messaggi' },
 
+  // I ricambi con i loro prezzi vengono dalla vecchia dashboard e NON coincidono
+  // con i preventivi di FileMaker: restano consultabili, ma fuori dal giro di
+  // tutti i giorni, per non farli scambiare per il listino buono.
+  { href: '/dashboard/inventory', label: 'Ricambi (vecchi prezzi)', icon: Package, can: canManageInventory, gruppo: 'Altro' },
   { href: '/dashboard/settings', label: 'Impostazioni', icon: Settings, can: canAccessSettings, gruppo: 'Altro' },
 ]
 
