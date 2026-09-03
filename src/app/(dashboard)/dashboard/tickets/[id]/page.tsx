@@ -238,6 +238,8 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
             (r: { family: string }) => r.family === famiglia
           )}
           canEdit={canEdit}
+          testoOriginale={ticket.estimate_notes}
+          importoOriginale={ticket.total_amount}
         />
 
         <Linguette

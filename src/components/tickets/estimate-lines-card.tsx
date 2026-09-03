@@ -19,6 +19,7 @@ const NOTE = [null, 'compreso recupero dati', 'senza recupero dati', 'solo recup
 
 export function EstimateLinesCard({
   ticketId, initialLines, priceList, pairs, searchHint, prezzi = [], modello = '', canEdit,
+  testoOriginale = null, importoOriginale = null,
 }: {
   ticketId: string
   initialLines: EstimateLine[]
@@ -28,6 +29,9 @@ export function EstimateLinesCard({
   prezzi?: Prezzo[]
   modello?: string
   canEdit: boolean
+  /** Il preventivo com'era scritto in FileMaker, per le schede d'archivio. */
+  testoOriginale?: string | null
+  importoOriginale?: number | null
 }) {
   const [lines, setLines] = useState<EstimateLine[]>(initialLines ?? [])
   const [pending, start] = useTransition()
@@ -92,7 +96,11 @@ export function EstimateLinesCard({
      preventivi già fatti — prende mezzo schermo e serve solo mentre si scrive
      il preventivo. Sta chiusa se qualche voce c'è già: nel giro di tutti i
      giorni la scheda si apre per LEGGERE il preventivo, non per rifarlo. */
-  const [attrezzi, setAttrezzi] = useState(lines.length === 0)
+  /* Le 12.789 schede venute da FileMaker non hanno righe: il preventivo è il
+     testo che fu mandato al cliente. Lì si mostra quello, parola per parola,
+     e la cassetta resta chiusa — quelle schede si leggono, non si rifanno. */
+  const soloTesto = lines.length === 0 && !!(testoOriginale ?? '').trim()
+  const [attrezzi, setAttrezzi] = useState(lines.length === 0 && !soloTesto)
 
   const fixed = lines.filter((r) => r.opt == null)
   const alts = lines.filter((r) => r.opt != null)
@@ -116,7 +124,9 @@ export function EstimateLinesCard({
               </button>
             )}
           </span>
-          <span className="font-mono text-xl tabular-nums">{eur(total(lines))}</span>
+          <span className="font-mono text-xl tabular-nums">
+            {eur(soloTesto ? Number(importoOriginale ?? 0) : total(lines))}
+          </span>
         </CardTitle>
         <CardDescription>
           Le voci si sommano. Le ipotesi sono alternative: nel totale entra solo quella scelta.
@@ -125,7 +135,22 @@ export function EstimateLinesCard({
       <CardContent className="space-y-4">
         {/* righe */}
         <div className="space-y-1.5">
-          {lines.length === 0 && (
+          {soloTesto && (
+            <div className="rounded-md border bg-muted/25 p-3">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Il preventivo come fu scritto
+              </p>
+              <p className="whitespace-pre-wrap break-words font-mono text-[13px] leading-snug">{testoOriginale}</p>
+              {canEdit && (
+                <button type="button" disabled={pending}
+                  onClick={() => save(parseEstimate(testoOriginale ?? ''))}
+                  className="mt-2.5 rounded border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-orange-400 hover:text-orange-600">
+                  trasforma in righe modificabili
+                </button>
+              )}
+            </div>
+          )}
+          {lines.length === 0 && !soloTesto && (
             <p className="text-sm text-muted-foreground">
               Nessuna voce. Prendila dal listino, oppure copiala da un preventivo già fatto.
             </p>
