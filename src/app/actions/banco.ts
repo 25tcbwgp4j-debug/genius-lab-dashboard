@@ -584,3 +584,104 @@ export async function duplicaSchedaAction(ticketId: string, stessoDispositivo: b
   revalidatePath('/dashboard/tickets')
   return { success: true, id: nuova.id, numero: nuova.ticket_number, stessoDispositivo }
 }
+
+/**
+ * «Vai alla scheda n.» — la casella del numero, come in FileMaker.
+ * Accetta il numero nudo (62796) e anche i doppioni col suffisso (62077-2).
+ */
+export async function vaiANumeroAction(numero: string) {
+  const n = numero.trim().replace(/[^0-9-]/g, '')
+  if (!n) return { error: 'Scrivi il numero della scheda' }
+  const { supabase } = await guard()
+  const { data } = await supabase
+    .from('tickets')
+    .select('id, ticket_number')
+    .or(`ticket_number.eq.${n},ticket_number.eq.${n}-2`)
+    .limit(1)
+    .maybeSingle()
+  if (data?.id) return { id: data.id as string }
+  // niente di esatto: si prova col numero che comincia così, il più recente
+  const { data: vicine } = await supabase
+    .from('tickets')
+    .select('id, ticket_number')
+    .like('ticket_number', `${n}%`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (vicine?.[0]?.id) return { id: vicine[0].id as string }
+  return { error: `Nessuna scheda n. ${n}` }
+}
+
+/**
+ * Elimina una scheda. In FileMaker c'era «Elimina record»: qui serve per le
+ * schede aperte per sbaglio o doppie.
+ *
+ * Sparisce la scheda con quello che le sta attaccato (eventi, pagamenti, flag);
+ * il **cliente resta** in rubrica e il dispositivo pure, perché possono avere
+ * altre schede. Non si torna indietro: chi chiama deve chiedere conferma.
+ */
+export async function eliminaSchedaAction(ticketId: string) {
+  const { supabase } = await guard()
+  const { data: t } = await supabase
+    .from('tickets').select('ticket_number').eq('id', ticketId).maybeSingle()
+  if (!t) return { error: 'Questa scheda non esiste più' }
+  for (const tabella of ['communication_flags', 'payments', 'ticket_events', 'ticket_ai_diagnosis']) {
+    await supabase.from(tabella).delete().eq('ticket_id', ticketId)
+  }
+  const { error } = await supabase.from('tickets').delete().eq('id', ticketId)
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard/tickets')
+  return { success: true, numero: t.ticket_number as string }
+}
+
+/**
+ * L'elenco per la pagina «Trova»: cerca su numero, cliente, modello e seriale.
+ * Torna anche quante ne ha trovate in tutto, come il conteggio del gruppo
+ * trovato di FileMaker, e una pagina per volta.
+ */
+export async function trovaSchedeAction(q: string, stato: string, pagina = 0) {
+  const { supabase } = await guard()
+  const per = 50
+  const da = Math.max(0, pagina) * per
+  const testo = q.trim().replace(/[,()*%]/g, ' ').slice(0, 80)
+
+  /* Cliente e dispositivo stanno in altre tabelle: prima si cercano lì, poi si
+     filtrano le schede per quegli id. Gli id vanno in un `in.(…)` e non in un
+     `eq` per ciascuno, e sono al massimo 80 per parte: la ricerca viaggia nella
+     riga dell'indirizzo, e con qualche centinaio di UUID la richiesta sfonda il
+     limite di lunghezza e torna un errore invece dei risultati.
+     Se un cognome pesca più di 80 clienti conviene scrivere anche il nome. */
+  const TETTO = 80
+  let filtroTesto: string | null = null
+  if (testo) {
+    const [{ data: cl }, { data: dv }] = await Promise.all([
+      supabase.from('customers').select('id')
+        .or(`first_name.ilike.%${testo}%,last_name.ilike.%${testo}%,company_name.ilike.%${testo}%,phone.ilike.%${testo}%`)
+        .limit(TETTO),
+      supabase.from('devices').select('id')
+        .or(`model.ilike.%${testo}%,serial_number.ilike.%${testo}%`)
+        .limit(TETTO),
+    ])
+    const idCl = (cl ?? []).map((r: { id: string }) => r.id)
+    const idDv = (dv ?? []).map((r: { id: string }) => r.id)
+    filtroTesto = [
+      `ticket_number.ilike.%${testo}%`,
+      ...(idCl.length ? [`customer_id.in.(${idCl.join(',')})`] : []),
+      ...(idDv.length ? [`device_id.in.(${idDv.join(',')})`] : []),
+    ].join(',')
+  }
+
+  let query = supabase
+    .from('tickets')
+    .select(`id, ticket_number, status, created_at, total_amount, office_owner,
+             customer:customers(first_name, last_name, company_name, phone),
+             device:devices(model, serial_number)`, { count: 'exact' })
+  if (stato && stato !== 'tutte' && STATI.includes(stato)) query = query.eq('status', stato)
+  if (stato === 'aperte') query = query.not('status', 'in', '(delivered,shipped,cancelled,unrepaired_returned)')
+  if (filtroTesto) query = query.or(filtroTesto)
+
+  const { data, count, error } = await query
+    .order('created_at', { ascending: false })
+    .range(da, da + per - 1)
+  if (error) return { rows: [], count: 0, per, error: error.message }
+  return { rows: data ?? [], count: count ?? 0, per }
+}
