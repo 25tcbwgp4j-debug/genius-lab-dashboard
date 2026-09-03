@@ -63,13 +63,15 @@ export function DashboardShell({ profile, children }: { profile: Profile; childr
   const push = usePushNotifications()
   const filtered = navItems.filter((item) => item.can(profile.role))
 
-  // Badge unread chat: polling 30s su /api/chat/conversations
+  /* Badge dei messaggi WhatsApp non letti, ogni 30 secondi.
+     L'indirizzo giusto è quello del proxy — `/api/chat/conversations` non è mai
+     esistito e dava un 404 nella console ogni mezzo minuto, col badge sempre a zero. */
   const [unread, setUnread] = useState(0)
   useEffect(() => {
     let cancelled = false
     const fetchUnread = async () => {
       try {
-        const res = await fetch('/api/chat/conversations')
+        const res = await fetch('/api/backend/api/chat/conversations?limit=100')
         if (!res.ok) return
         const data = await res.json()
         const list = data.conversations || []
