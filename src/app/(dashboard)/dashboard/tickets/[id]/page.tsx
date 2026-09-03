@@ -330,7 +330,9 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
       {/* la pulsantiera */}
       <aside className="border-t bg-background p-3 lg:overflow-y-auto lg:border-l lg:border-t-0">
         <BancoRack ticketId={id} flags={commFlags ?? []} dati={dati}
-          spedizione={!!ticket.shipping_required} canEdit={canEdit} />
+          spedizione={!!ticket.shipping_required} canEdit={canEdit}
+          preventivoScritto={!!(ticket.estimate_notes ?? '').trim() || Number(ticket.total_amount) > 0
+            || (Array.isArray(ticket.estimate_lines) && ticket.estimate_lines.length > 0)} />
       </aside>
     </div>
   )

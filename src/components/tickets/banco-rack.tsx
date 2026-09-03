@@ -23,13 +23,15 @@ const COMUNICAZIONI = [
 ]
 
 export function BancoRack({
-  ticketId, flags, dati, spedizione, canEdit,
+  ticketId, flags, dati, spedizione, canEdit, preventivoScritto = false,
 }: {
   ticketId: string
   flags: Flag[]
   dati: Record<string, string | null>
   spedizione: boolean
   canEdit: boolean
+  /** C'è già un preventivo su questa scheda: allora il pezzo l'abbiamo visto. */
+  preventivoScritto?: boolean
 }) {
   const [pending, start] = useTransition()
   const [esito, setEsito] = useState<{ ok: boolean; testo: string } | null>(null)
@@ -50,11 +52,14 @@ export function BancoRack({
 
   /* Il passo che tocca adesso. Se manca un presupposto, non si propone niente
      e si dice perché. */
-  /* Sulle schede venute da FileMaker `arrived_at` spesso manca, ma se il
-     preventivo è già partito il pezzo è ovviamente arrivato: non ha senso
-     dire «non è ancora arrivato» su una scheda accettata. */
+  /* Sulle schede venute da FileMaker `arrived_at` non c'è, e nemmeno i flag
+     delle mail: erano stati mandati da FileMaker, non da qui. Restava scritto
+     «il dispositivo non è ancora arrivato» su tutte e 12.789 le schede
+     d'archivio. Un preventivo scritto è la prova che il pezzo l'abbiamo avuto
+     in mano: non si preventiva quello che non si è visto. */
   const arrivato = !!(dati.arrived_at || dati.approved_at || dati.repaired_at ||
-                      dati.ready_for_pickup_at || dati.estimate_sent_at || dati.refused_at)
+                      dati.ready_for_pickup_at || dati.estimate_sent_at || dati.refused_at ||
+                      preventivoScritto)
 
   const passo = (() => {
     if (dati.delivered_at) return null
