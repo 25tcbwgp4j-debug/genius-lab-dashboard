@@ -185,9 +185,12 @@ export function NuovaScheda({ difetti, modelli }: { difetti: string[]; modelli: 
       <Sezione titolo="Difetto indicato dal cliente">
         <select
           onChange={(e) => {
-            if (!e.target.value) return
-            setDifetto((d) => (d.trim() ? d.trim() + '\n' + e.target.value : e.target.value))
+            // il valore va letto SUBITO: l'aggiornamento arriva dopo, e a quel
+            // punto il menu è già stato riportato a vuoto
+            const voce = e.target.value
             e.target.value = ''
+            if (!voce) return
+            setDifetto((d) => (d.trim() ? d.trim() + '\n' + voce : voce))
           }}
           className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           aria-label="Difetti ricorrenti"
