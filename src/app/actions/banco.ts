@@ -3,6 +3,7 @@
 import { createStaffClient } from '@/lib/supabase/staff'
 import { revalidatePath } from 'next/cache'
 import { richiediStaff } from '@/lib/auth/staff'
+import { getNextTicketNumber } from '@/services/tickets/numbering'
 import { dispatchNotification, type NotificationEvent } from '@/services/notifications/dispatch'
 import { total, estimateText, type EstimateLine } from '@/lib/banco/estimate'
 
@@ -327,4 +328,155 @@ export async function lavoriSuQuestoModelloAction(modello: string) {
   }
   gruppi.sort((a, b) => b.volte - a.volte)
   return { gruppi }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Aprire una scheda in un colpo solo.
+
+   Prima bisognava creare il cliente in una pagina, il dispositivo in un'altra,
+   poi tornare qui e sceglierli da una tendina con 8.273 nomi in ordine
+   alfabetico. Nove passaggi per un cliente nuovo che entra in negozio.
+   Al banco si fa così: nome, telefono, cos'è, cos'ha. E la scheda è aperta.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const soloCifre = (t: string) => String(t || '').replace(/\D/g, '')
+
+export async function cercaClienteAction(q: string) {
+  await richiediStaff()
+  const t = (q || '').trim()
+  if (t.length < 2) return { clienti: [] }
+  const supabase = await createStaffClient()
+  const cifre = soloCifre(t)
+
+  // si cerca per nome o per numero: al banco spesso si parte dal telefono
+  const filtro = cifre.length >= 4
+    ? `phone.ilike.%${cifre.slice(-9)}%,first_name.ilike.%${t}%,last_name.ilike.%${t}%,company_name.ilike.%${t}%`
+    : `first_name.ilike.%${t}%,last_name.ilike.%${t}%,company_name.ilike.%${t}%`
+
+  const { data } = await supabase
+    .from('customers')
+    .select('id, first_name, last_name, company_name, phone, email')
+    .or(filtro)
+    .limit(8)
+  return { clienti: data ?? [] }
+}
+
+/** Quante schede ha già questo cliente, e su quali dispositivi. */
+export async function storicoClienteAction(customerId: string) {
+  await richiediStaff()
+  const supabase = await createStaffClient()
+  const { data } = await supabase
+    .from('tickets')
+    .select('ticket_number, created_at, device:devices(model)')
+    .eq('customer_id', customerId)
+    .order('created_at', { ascending: false })
+    .limit(5)
+  const { count } = await supabase
+    .from('tickets')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_id', customerId)
+  return { ultime: data ?? [], totale: count ?? 0 }
+}
+
+/** Il modello dalle ultime 4 cifre del seriale Apple. */
+export async function modelloDaSerialeAction(seriale: string) {
+  await richiediStaff()
+  const s = String(seriale || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (s.length < 11) return { modello: null }   // i seriali nuovi a 10 non dicono nulla
+  const supabase = await createStaffClient()
+  const { data } = await supabase
+    .from('serial_models')
+    .select('model, family, seen')
+    .eq('code', s.slice(-4))
+    .maybeSingle()
+  return { modello: data ?? null }
+}
+
+export async function creaSchedaAction(d: {
+  clienteId?: string | null
+  nome: string
+  telefono: string
+  email: string
+  modello: string
+  seriale: string
+  difetto: string
+  codiceSblocco?: string
+}) {
+  await richiediStaff()
+  const nome = (d.nome || '').trim()
+  const modello = (d.modello || '').trim()
+  if (!nome) return { error: 'Manca il nome del cliente' }
+  if (!modello) return { error: 'Manca il dispositivo' }
+
+  const supabase = await createStaffClient()
+  const staff = await richiediStaff()
+
+  // il cliente: quello scelto, o uno nuovo creato al volo
+  let clienteId = d.clienteId ?? null
+  if (!clienteId) {
+    const parti = nome.split(/\s+/)
+    const azienda = /s\.?r\.?l|s\.?n\.?c|s\.?a\.?s|s\.?p\.?a|srls|snc|sas|spa|studio|computer|service/i.test(nome)
+    const { data: nuovo, error } = await supabase
+      .from('customers')
+      .insert({
+        first_name: azienda || parti.length === 1 ? nome.slice(0, 200) : parti.slice(0, -1).join(' ').slice(0, 200),
+        last_name: azienda || parti.length === 1 ? '' : parti[parti.length - 1].slice(0, 200),
+        company_name: azienda ? nome.slice(0, 200) : null,
+        phone: (d.telefono || '').trim() || '—',
+        email: (d.email || '').trim(),
+      })
+      .select('id')
+      .single()
+    if (error) return { error: `Cliente non creato: ${error.message}` }
+    clienteId = nuovo.id
+  }
+
+  const categoria = (() => {
+    const m = modello.toUpperCase()
+    if (m.includes('IPHONE')) return 'iphone'
+    if (m.includes('IPAD')) return 'ipad'
+    if (m.includes('MACBOOK')) return 'macbook'
+    if (m.includes('IMAC') || m.includes('MAC ')) return 'imac'
+    if (m.includes('WATCH')) return 'apple_watch'
+    if (m.includes('AIRPODS')) return 'airpods'
+    return 'other'
+  })()
+
+  const { data: disp, error: eDisp } = await supabase
+    .from('devices')
+    .insert({
+      customer_id: clienteId,
+      category: categoria,
+      model: modello.slice(0, 200),
+      serial_number: (d.seriale || '').trim() || null,
+      customer_reported_issue: (d.difetto || '').trim() || null,
+      device_password: (d.codiceSblocco || '').trim() || null,
+    })
+    .select('id')
+    .single()
+  if (eDisp) return { error: `Dispositivo non creato: ${eDisp.message}` }
+
+  const numero = await getNextTicketNumber()
+  const adesso = new Date().toISOString()
+  const { data: scheda, error: eT } = await supabase
+    .from('tickets')
+    .insert({
+      ticket_number: numero,
+      customer_id: clienteId,
+      device_id: disp.id,
+      created_by_user_id: staff,
+      status: 'intake_completed',
+      priority: 'normal',
+      intake_summary: (d.difetto || '').trim() || null,
+      arrived_at: adesso,          // se si apre col pezzo in mano, è già arrivato
+      public_tracking_token: crypto.randomUUID().replace(/-/g, ''),
+      estimate_lines: [],
+      work_log: [],
+    })
+    .select('id, ticket_number')
+    .single()
+  if (eT) return { error: `Scheda non creata: ${eT.message}` }
+
+  revalidatePath('/dashboard/tickets')
+  return { success: true, id: scheda.id, numero: scheda.ticket_number }
 }
