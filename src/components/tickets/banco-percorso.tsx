@@ -66,45 +66,44 @@ export function BancoPercorso({
     start(async () => { await setMilestoneAction(ticketId, k, on) })
 
   return (
-    <ol className="relative">
-      {tappe.map((t, i) => {
+    /* Una striscia, non una colonna: nove tappe in verticale mangiavano mezzo
+       schermo prima ancora di arrivare al preventivo. Qui stanno su due righe,
+       e si legge in un colpo a che punto è il pezzo. */
+    <ol className="flex flex-wrap gap-x-1 gap-y-2">
+      {tappe.map((t) => {
         const fatto = !!dati[t.k]
         const ora = t.k === prossima
         const modificabile = canEdit && t.k !== 'created_at' && t.k !== 'estimate_sent_at'
+        const dettaglio =
+          t.det === 'ritiro' && dati.courier_name
+            ? `${dati.courier_name}${dati.tracking_code ? ` · ${dati.tracking_code}` : ''}`
+            : t.det === 'uscita' && fatto
+              ? (dati.shipped_at ? 'spedito' : 'riconsegnato a mano')
+              : null
         return (
-          <li key={t.k} className="relative flex items-center justify-between gap-3 py-2 pl-6">
-            <span aria-hidden className={`absolute left-0 top-[1.05rem] h-2.5 w-2.5 rounded-full ${
-              fatto ? 'bg-emerald-500' : ora ? 'bg-orange-500 ring-4 ring-orange-100' : 'bg-background ring-2 ring-muted'
-            }`} />
-            {i < tappe.length - 1 && (
-              <span aria-hidden className={`absolute left-[0.28rem] top-7 bottom-0 w-px ${fatto ? 'bg-emerald-200' : 'bg-muted'}`} />
+          <li key={t.k} className={`flex min-w-[8.5rem] flex-1 flex-col gap-0.5 rounded-md border px-2 py-1.5 ${
+            ora ? 'border-orange-400 bg-orange-50/60' : fatto ? 'border-emerald-200 bg-emerald-50/40' : 'border-dashed'
+          }`}>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${
+                fatto ? 'bg-emerald-500' : ora ? 'bg-orange-500' : 'bg-muted-foreground/25'
+              }`} />
+              <span className={`text-[11px] leading-tight ${
+                fatto ? 'font-medium' : ora ? 'font-semibold text-orange-700' : 'text-muted-foreground'
+              }`}>{t.e}</span>
+            </span>
+            <time className="pl-3.5 font-mono text-[10px] leading-tight tabular-nums text-muted-foreground">
+              {quando(dati[t.k]) ?? '—'}
+            </time>
+            {dettaglio && <em className="pl-3.5 text-[10px] not-italic leading-tight text-muted-foreground">{dettaglio}</em>}
+            {modificabile && (
+              <button type="button" disabled={pending} onClick={() => segna(t.k, !fatto)}
+                className={`ml-3.5 mt-0.5 self-start rounded border px-1.5 text-[10px] leading-4 ${
+                  ora ? 'border-orange-400 font-semibold text-orange-600 hover:bg-orange-500 hover:text-white'
+                      : 'text-muted-foreground hover:text-foreground'}`}>
+                {fatto ? 'annulla' : 'segna'}
+              </button>
             )}
-            <span className={`text-sm ${fatto ? 'font-medium' : ora ? 'font-semibold text-orange-600' : 'text-muted-foreground'}`}>
-              {t.e}
-              {t.det === 'ritiro' && dati.courier_name && (
-                <em className="ml-2 text-xs not-italic text-muted-foreground">
-                  {dati.courier_name}{dati.tracking_code ? ` · ${dati.tracking_code}` : ''}
-                </em>
-              )}
-              {t.det === 'uscita' && fatto && (
-                <em className="ml-2 text-xs not-italic text-muted-foreground">
-                  {dati.shipped_at ? 'spedito' : 'riconsegnato a mano'}
-                </em>
-              )}
-            </span>
-            <span className="flex shrink-0 items-center gap-2">
-              <time className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                {quando(dati[t.k]) ?? '—'}
-              </time>
-              {modificabile && (
-                <button type="button" disabled={pending} onClick={() => segna(t.k, !fatto)}
-                  className={`rounded border px-2 py-0.5 text-[10px] ${
-                    ora ? 'border-orange-400 font-semibold text-orange-600 hover:bg-orange-500 hover:text-white'
-                        : 'text-muted-foreground hover:text-foreground'}`}>
-                  {fatto ? 'annulla' : 'segna'}
-                </button>
-              )}
-            </span>
           </li>
         )
       })}

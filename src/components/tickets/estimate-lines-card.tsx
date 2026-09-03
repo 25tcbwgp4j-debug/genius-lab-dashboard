@@ -88,6 +88,12 @@ export function EstimateLinesCard({
     })
   }
 
+  /* La cassetta degli attrezzi — listino, ipotesi, spedizione, ricerca fra i
+     preventivi già fatti — prende mezzo schermo e serve solo mentre si scrive
+     il preventivo. Sta chiusa se qualche voce c'è già: nel giro di tutti i
+     giorni la scheda si apre per LEGGERE il preventivo, non per rifarlo. */
+  const [attrezzi, setAttrezzi] = useState(lines.length === 0)
+
   const fixed = lines.filter((r) => r.opt == null)
   const alts = lines.filter((r) => r.opt != null)
   const missing = lines.filter((r) => (r.opt == null || r.on) && !r.p).length
@@ -98,7 +104,18 @@ export function EstimateLinesCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between gap-3">
-          <span>Preventivo</span>
+          <span className="flex items-center gap-3">
+            Preventivo
+            {canEdit && (
+              <button type="button" onClick={() => setAttrezzi((v) => !v)}
+                aria-expanded={attrezzi}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-normal transition-colors ${
+                  attrezzi ? 'border-orange-400 bg-orange-50 text-orange-700' : 'hover:border-orange-400 hover:bg-orange-50'
+                }`}>
+                {attrezzi ? 'chiudi' : '+ aggiungi voci'}
+              </button>
+            )}
+          </span>
           <span className="font-mono text-xl tabular-nums">{eur(total(lines))}</span>
         </CardTitle>
         <CardDescription>
@@ -175,7 +192,7 @@ export function EstimateLinesCard({
         )}
         {msg && <p className="text-xs text-destructive">{msg}</p>}
 
-        {canEdit && (
+        {canEdit && attrezzi && (
           <>
             <section>
               <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

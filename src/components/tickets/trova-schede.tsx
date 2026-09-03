@@ -60,6 +60,7 @@ export function TrovaSchede({ statoIniziale = 'tutte' }: { statoIniziale?: strin
   const [righe, setRighe] = useState<Riga[]>([])
   const [trovate, setTrovate] = useState(0)
   const [per, setPer] = useState(50)
+  const [errore, setErrore] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
   useEffect(() => { setPagina(0) }, [q, stato])
@@ -67,6 +68,8 @@ export function TrovaSchede({ statoIniziale = 'tutte' }: { statoIniziale?: strin
     const t = setTimeout(() => {
       start(async () => {
         const r = await trovaSchedeAction(q, stato, pagina)
+        // se la ricerca si rompe si dice: prima tornava «nessuna scheda», che è un'altra cosa
+        setErrore(r.error ?? null)
         setRighe((r.rows ?? []) as unknown as Riga[])
         setTrovate(r.count ?? 0)
         setPer(r.per ?? 50)
@@ -108,7 +111,8 @@ export function TrovaSchede({ statoIniziale = 'tutte' }: { statoIniziale?: strin
           </button>
         ))}
         <span className="ml-auto text-xs text-muted-foreground">
-          {pending ? 'cerco…' : <><b className="tabular-nums text-foreground">{trovate.toLocaleString('it-IT')}</b> schede trovate</>}
+          {pending ? 'cerco…' : errore ? <b className="text-red-600">{errore}</b>
+            : <><b className="tabular-nums text-foreground">{trovate.toLocaleString('it-IT')}</b> schede trovate</>}
         </span>
       </div>
 
@@ -148,7 +152,7 @@ export function TrovaSchede({ statoIniziale = 'tutte' }: { statoIniziale?: strin
             ))}
             {!pending && righe.length === 0 && (
               <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-muted-foreground">
-                Nessuna scheda con questi criteri.
+                {errore ? `La ricerca si è rotta: ${errore}` : 'Nessuna scheda con questi criteri.'}
               </td></tr>
             )}
           </tbody>
