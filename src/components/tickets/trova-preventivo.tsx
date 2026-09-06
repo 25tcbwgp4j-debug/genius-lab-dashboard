@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { trovaPreventiviAction } from '@/app/actions/banco'
-import { parseEstimate, type EstimateLine } from '@/lib/banco/estimate'
+import { parseEstimate, total, type EstimateLine } from '@/lib/banco/estimate'
 
 /**
  * Trovare il preventivo già fatto su un dispositivo identico, e copiarlo.
@@ -62,6 +62,7 @@ export function TrovaPreventivo({
   const [allargato, setAllargato] = useState(false)
   const [errore, setErrore] = useState<string | null>(null)
   const [cercato, setCercato] = useState(false)
+  const [avviso, setAvviso] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
   const cerca = () => start(async () => {
@@ -113,6 +114,12 @@ export function TrovaPreventivo({
         </p>
       )}
 
+      {avviso && (
+        <p className="mb-2 rounded border border-amber-400 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-900">
+          {avviso}
+        </p>
+      )}
+
       <div className="max-h-80 space-y-1.5 overflow-y-auto">
         {righe.map((z) => (
           <div key={z.card_no} className="rounded-md border bg-background px-2.5 py-2">
@@ -124,7 +131,17 @@ export function TrovaPreventivo({
               <span className="flex-1 truncate font-medium">{z.model || z.family}</span>
               <b className="font-mono tabular-nums">{eur(Number(z.price ?? 0))}</b>
               {canEdit && (
-                <button type="button" onClick={() => onCopia(parseEstimate(z.body))}
+                <button type="button" onClick={() => {
+                    const righe = parseEstimate(z.body)
+                    onCopia(righe)
+                    /* Il prezzo di scheda e il testo non sempre coincidono: su un quarto
+                       dell'archivio la cifra segnata comprende voci che nel testo non
+                       compaiono. Meglio dirlo che far partire un preventivo sbagliato. */
+                    const ric = total(righe), seg = Number(z.price ?? 0)
+                    setAvviso(seg && Math.abs(ric - seg) > 1
+                      ? `Copiato dalla n. ${z.card_no}: dal testo vengono ${eur(ric)}, ma su quella scheda era segnato ${eur(seg)}. Controlla se manca una voce.`
+                      : null)
+                  }}
                   className="flex items-center gap-1 rounded border border-orange-400 px-2 py-0.5 text-[11px] font-medium text-orange-700 hover:bg-orange-500 hover:text-white">
                   <Plus className="h-3 w-3" />Copia
                 </button>

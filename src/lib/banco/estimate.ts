@@ -27,14 +27,27 @@ export const num = (v: unknown): number => {
 
 export const isActive = (r: EstimateLine) => r.opt == null || r.on === true
 
+export const IVA = 0.22
+
+/**
+ * Quanto pesa una riga sul totale.
+ *
+ * Se la voce è scritta «+IVA» l'importo è il NETTO e il cliente paga il lordo:
+ * su 561 preventivi dell'archivio scritti così, in 9 casi su 10 il prezzo
+ * segnato sulla scheda è esattamente l'importo × 1,22. Sommare il netto voleva
+ * dire copiare un preventivo da 378 € e ritrovarselo a 310.
+ */
+export const rowTotal = (r: EstimateLine): number =>
+  Math.round(num(r.p) * (r.iva ? 1 + IVA : 1) * 100) / 100
+
 export const total = (lines: EstimateLine[]): number =>
-  (lines ?? []).filter(isActive).reduce((t, r) => t + num(r.p), 0)
+  Math.round((lines ?? []).filter(isActive).reduce((t, r) => t + rowTotal(r), 0) * 100) / 100
 
 /** Il totale se il cliente scegliesse l'ipotesi i-esima (voci fisse comprese). */
 export const totalWith = (lines: EstimateLine[], opt: number): number => {
-  const fixed = lines.filter((r) => r.opt == null).reduce((t, r) => t + num(r.p), 0)
+  const fixed = lines.filter((r) => r.opt == null).reduce((t, r) => t + rowTotal(r), 0)
   const alt = lines.find((r) => r.opt === opt)
-  return fixed + (alt ? num(alt.p) : 0)
+  return Math.round((fixed + (alt ? rowTotal(alt) : 0)) * 100) / 100
 }
 
 /** Il testo che finisce nella mail e nel PDF del cliente. */
