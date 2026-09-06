@@ -127,10 +127,6 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
     return (dev?.model ?? '').toUpperCase() || null
   })()
 
-  const cercaSimili = [
-    (dev?.model ?? '').match(/\b(air|pro|mini|imac|iphone|ipad|watch|airpods|studio)\b/i)?.[1]?.toLowerCase(),
-    (dev?.model ?? '').match(/\b(20\d{2})\b/)?.[1],
-  ].filter(Boolean).join(' ')
 
   const dati: Record<string, string | null> = {
     created_at: ticket.created_at, pickup_requested_at: ticket.pickup_requested_at,
@@ -232,7 +228,7 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
           initialLines={Array.isArray(ticket.estimate_lines) ? ticket.estimate_lines : []}
           priceList={priceList ?? []}
           pairs={(estimatePairs ?? []) as never}
-          searchHint={cercaSimili}
+          searchHint={dev?.customer_reported_issue || ticket.intake_summary || ''}
           modello={dev?.model ?? ''}
           prezzi={(prezziDispositivo ?? []).filter(
             (r: { family: string }) => r.family === famiglia

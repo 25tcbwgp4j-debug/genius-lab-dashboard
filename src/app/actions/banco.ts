@@ -685,3 +685,55 @@ export async function trovaSchedeAction(q: string, stato: string, pagina = 0) {
   if (error) return { rows: [], count: 0, per, error: error.message }
   return { rows: data ?? [], count: count ?? 0, per }
 }
+
+/**
+ * «Trova un preventivo già fatto» — la ricerca come si fa in FileMaker.
+ *
+ * Al banco il preventivo non si inventa: si cerca la scheda di un dispositivo
+ * identico e si copia. In FileMaker si entra in Trova e si scrivono tre cose —
+ * il modello («pro 13»), l'anno («2020») e il lavoro («logica») — in tre campi
+ * diversi, che FileMaker mette in AND.
+ *
+ * ⚠️ La ricerca va fatta **parola per parola**, non con la stringa intera:
+ * il modello grezzo è scritto «MacBook Pro (13-inch, 2020)», quindi un
+ * `ilike '%pro 13%'` non lo trova — la parentesi sta in mezzo. Cercando «pro»
+ * e «13» separatamente si passa da 28 risultati a 1.096.
+ *
+ * ⚠️ Il modello grezzo (`model`) manca su 2.069 preventivi su 6.688, e l'anno
+ * del dispositivo sta lì dentro: filtrare per anno taglia via un terzo
+ * dell'archivio. Perciò, se con l'anno restano meno di tre preventivi, si
+ * riprova senza e lo si dice — meglio un prezzo di un anno vicino che nessuno.
+ */
+export async function trovaPreventiviAction(modello: string, anno: string, lavoro: string) {
+  const { supabase } = await guard()
+  const pul = (t: string) => t.replace(/[,()*%".]/g, ' ').trim()
+  const parole = pul(modello).split(/\s+/).filter((p) => p.length >= 2).slice(0, 4)
+  const a = anno.replace(/\D/g, '').slice(0, 4)
+  const l = pul(lavoro).slice(0, 40)
+  if (!parole.length && !a && !l) return { rows: [], count: 0, mediana: 0 }
+
+  const query = (conAnno: boolean) => {
+    let q = supabase
+      .from('past_estimates')
+      .select('card_no, model, family, fault, body, price, year, month', { count: 'exact' })
+    // il modello sta in `family` (sempre pieno) oppure in `model` (grezzo)
+    for (const p of parole) q = q.or(`family.ilike.%${p}%,model.ilike.%${p}%`)
+    if (conAnno && a) q = q.or(`family.ilike.%${a}%,model.ilike.%${a}%`)
+    if (l) q = q.ilike('body', `%${l}%`)
+    return q.order('year', { ascending: false }).order('month', { ascending: false }).limit(40)
+  }
+
+  let { data, count, error } = await query(true)
+  let allargato = false
+  if (!error && a && (count ?? 0) < 3) {
+    const r = await query(false)
+    if (!r.error && (r.count ?? 0) > (count ?? 0)) {
+      data = r.data; count = r.count; allargato = true
+    }
+  }
+  if (error) return { rows: [], count: 0, mediana: 0, error: error.message }
+
+  const prezzi = (data ?? []).map((z) => Number(z.price)).filter((n) => n > 0).sort((x, y) => x - y)
+  const mediana = prezzi.length ? prezzi[Math.floor(prezzi.length / 2)] : 0
+  return { rows: data ?? [], count: count ?? 0, mediana, allargato }
+}

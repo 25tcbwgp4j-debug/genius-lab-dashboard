@@ -4,15 +4,15 @@ import { useState, useTransition } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Search, Check } from 'lucide-react'
-import { saveEstimateLinesAction, searchPastEstimatesAction } from '@/app/actions/banco'
+import { Plus, Trash2, Check } from 'lucide-react'
+import { saveEstimateLinesAction } from '@/app/actions/banco'
 import { parseEstimate, total, totalWith, num, type EstimateLine } from '@/lib/banco/estimate'
 import { LavoriRicorrenti } from './lavori-ricorrenti'
+import { TrovaPreventivo } from './trova-preventivo'
 
 type PriceRow = { id: string; label: string; intervention: string | null; price: number | null; is_shipping: boolean }
 type Pair = { id: string; label: string; first_line: { t: string; nota?: string; i?: string }; second_line: { t: string; nota?: string; i?: string } }
 type Prezzo = { family: string; intervention: string; price: number; jobs: number; basis: string }
-type Past = { card_no: string; model: string | null; family: string | null; fault: string | null; body: string; price: number | null; year: number | null; month: number | null }
 
 const eur = (n: number) => (n ? `€ ${n.toLocaleString('it-IT')}` : '—')
 const NOTE = [null, 'compreso recupero dati', 'senza recupero dati', 'solo recupero dati']
@@ -36,9 +36,6 @@ export function EstimateLinesCard({
   const [lines, setLines] = useState<EstimateLine[]>(initialLines ?? [])
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<string | null>(null)
-  const [q, setQ] = useState(searchHint)
-  const [past, setPast] = useState<Past[] | null>(null)
-  const [searching, setSearching] = useState(false)
 
   /* Quanto è stato incassato su questo stesso dispositivo per questo lavoro.
      Non è una stima: è la mediana dei preventivi accettati. */
@@ -84,13 +81,6 @@ export function EstimateLinesCard({
     save(next)
   }
 
-  const search = () => {
-    setSearching(true)
-    start(async () => {
-      const r = await searchPastEstimatesAction(q)
-      setPast(r.rows as Past[]); setSearching(false)
-    })
-  }
 
   /* La cassetta degli attrezzi — listino, ipotesi, spedizione, ricerca fra i
      preventivi già fatti — prende mezzo schermo e serve solo mentre si scrive
@@ -217,6 +207,16 @@ export function EstimateLinesCard({
         )}
         {msg && <p className="text-xs text-destructive">{msg}</p>}
 
+        {canEdit && (
+          <section>
+            <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Copia un preventivo già fatto su un dispositivo identico
+            </h4>
+            <TrovaPreventivo modelloDispositivo={modello} difetto={searchHint}
+              canEdit={canEdit} onCopia={(righe) => save(righe)} />
+          </section>
+        )}
+
         {canEdit && attrezzi && (
           <>
             <section>
@@ -287,42 +287,6 @@ export function EstimateLinesCard({
               </div>
             </section>
 
-            <section>
-              <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Preventivi già fatti — i prezzi giusti stanno qui
-              </h4>
-              <div className="flex gap-1.5">
-                <Input value={q} onChange={(e) => setQ(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); search() } }}
-                  placeholder="modello, anno, intervento — es. air 2020 logica" className="h-8 font-mono text-xs" />
-                <Button type="button" size="sm" variant="outline" onClick={search} disabled={pending}>
-                  <Search className="mr-1 h-3.5 w-3.5" />Cerca
-                </Button>
-              </div>
-              {searching && <p className="mt-2 text-xs text-muted-foreground">Cerco…</p>}
-              {past && !searching && (
-                past.length === 0
-                  ? <p className="mt-2 text-xs text-muted-foreground">Nessun preventivo con tutte queste parole. Prova a togliere un termine.</p>
-                  : <div className="mt-2 max-h-72 space-y-1.5 overflow-y-auto">
-                      {past.map((z, i) => (
-                        <div key={i} className="rounded-md border px-2 py-1.5">
-                          <div className="flex flex-wrap items-baseline gap-2 text-xs">
-                            <span className="font-mono text-muted-foreground">n. {z.card_no}</span>
-                            <span className="font-mono text-muted-foreground">{String(z.month ?? '').padStart(2, '0')}/{z.year}</span>
-                            <span className="flex-1 font-medium">{z.model || z.family}</span>
-                            <b className="font-mono">{eur(Number(z.price ?? 0))}</b>
-                            <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-[11px]"
-                              onClick={() => save(parseEstimate(z.body))}>
-                              <Plus className="mr-1 h-3 w-3" />Copia
-                            </Button>
-                          </div>
-                          {z.fault && <p className="mt-0.5 text-[11px] italic text-muted-foreground">{z.fault}</p>}
-                          <p className="mt-0.5 break-words text-[11px] leading-snug">{z.body}</p>
-                        </div>
-                      ))}
-                    </div>
-              )}
-            </section>
           </>
         )}
 
