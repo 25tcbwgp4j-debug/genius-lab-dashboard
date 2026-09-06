@@ -58,6 +58,7 @@ export function TrovaPreventivo({
   const [righe, setRighe] = useState<Riga[]>([])
   const [quante, setQuante] = useState(0)
   const [mediana, setMediana] = useState(0)
+  const [ip, setIp] = useState({ riparazione: 0, sostituzione: 0, quante: 0 })
   const [allargato, setAllargato] = useState(false)
   const [anno, setAnno] = useState<string | undefined>()
   const [errore, setErrore] = useState<string | null>(null)
@@ -71,6 +72,7 @@ export function TrovaPreventivo({
     setRighe((r.rows ?? []) as unknown as Riga[])
     setQuante(r.count ?? 0)
     setMediana(r.mediana ?? 0)
+    setIp({ riparazione: r.riparazione ?? 0, sostituzione: r.sostituzione ?? 0, quante: r.conDueIpotesi ?? 0 })
     setAllargato(!!r.allargato)
     setAnno(r.anno)
     setCercato(true)
@@ -124,6 +126,15 @@ export function TrovaPreventivo({
                 {mediana > 0 && <> · di solito <b className="text-foreground">{eur(mediana)}</b></>}</>}
         </span>
       </div>
+
+      {ip.quante > 0 && ip.riparazione > 0 && ip.sostituzione > 0 && (
+        <p className="mt-1.5 rounded border border-orange-200 bg-background px-2.5 py-1.5 text-[11px] leading-snug">
+          <b>{ip.quante}</b> di questi sono a due ipotesi:
+          {' '}riparazione <b className="font-mono">{eur(ip.riparazione)}</b>
+          {' · '}sostituzione integrale <b className="font-mono">{eur(ip.sostituzione)}</b>
+          <span className="text-muted-foreground"> — il cliente sceglie</span>
+        </p>
+      )}
 
       {allargato && (
         <p className="mt-1.5 text-[11px] text-orange-700">

@@ -749,10 +749,39 @@ export async function trovaPreventiviAction(q: string) {
   }
   if (error) return { rows: [], count: 0, mediana: 0, error: error.message }
 
-  const prezzi = (data ?? []).map((z) => Number(z.price)).filter((n) => n > 0).sort((x, y) => x - y)
+  const med = (v: number[]) =>
+    v.length ? [...v].sort((x, y) => x - y)[Math.floor(v.length / 2)] : 0
+
+  /* Un preventivo di solito NON è una voce unica: si propongono due strade e
+     sceglie il cliente. La 1ª è la riparazione a componente (la nostra), la 2ª
+     è la sostituzione integrale come la prevede Apple. Su tutto l'archivio la
+     seconda costa 1,6 volte la prima sulle schede logiche, 1,8 sui display e
+     2,2 sul top case. Un solo numero medio non dice niente: servono i due. */
+  const IPOTESI = /(\d)\s*°\s*IPOTESI\s*:?([\s\S]*?)(?=\d\s*°\s*IPOTESI|$)/gi
+  const importi = (t: string) =>
+    [...(t.match(/€\s?\d[\d.,]*/g) ?? [])]
+      .map((x) => Number(x.replace(/[€\s.]/g, '').replace(',', '.')))
+      .filter((n) => n > 30 && n < 3000)
+
+  const uno: number[] = [], due: number[] = []
+  let conDueIpotesi = 0
+  for (const z of data ?? []) {
+    const parti = [...(z.body ?? '').matchAll(IPOTESI)]
+    if (parti.length < 2) continue
+    conDueIpotesi++
+    for (const [, n, testo] of parti) {
+      const v = importi(testo)
+      if (!v.length) continue
+      if (n === '1') uno.push(v[0])
+      else if (n === '2') due.push(v[0])
+    }
+  }
+
+  const prezzi = (data ?? []).map((z) => Number(z.price)).filter((n) => n > 0)
   return {
     rows: data ?? [], count: count ?? 0,
-    mediana: prezzi.length ? prezzi[Math.floor(prezzi.length / 2)] : 0,
+    mediana: med(prezzi),
+    riparazione: med(uno), sostituzione: med(due), conDueIpotesi,
     allargato, anno,
   }
 }
