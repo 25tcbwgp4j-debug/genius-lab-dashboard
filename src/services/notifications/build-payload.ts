@@ -69,6 +69,9 @@ export async function buildNotificationPayload(
       : 'Dopo il bonifico conservare la ricevuta e presentarla al ritiro o inviarla ai recapiti indicati.',
     shipping_address: (ticket.shipping_address as string) ?? '',
     courier_name: (ticket.courier_name as string) ?? '',
+    // i modelli scrivono «Corriere: {{courier}}»: senza questo alias al cliente
+    // arrivava la graffa in chiaro
+    courier: (ticket.courier_name as string) ?? '',
     tracking_code: (ticket.tracking_code as string) ?? '',
     recipient_name: (ticket.recipient_name as string) ?? '',
     recipient_phone: (ticket.recipient_phone as string) ?? '',

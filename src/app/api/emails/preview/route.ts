@@ -28,6 +28,7 @@ const SAMPLE_PAYLOAD: Record<string, string> = {
   beneficiary: 'Genius Lab S.r.l.',
   payment_instructions: 'Bonifico bancario. Indicare in causale: GL e numero riparazione.',
   courier_name: 'DHL',
+  courier: 'DHL',
   tracking_code: '1234567890',
 }
 

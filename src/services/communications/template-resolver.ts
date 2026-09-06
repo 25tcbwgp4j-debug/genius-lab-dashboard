@@ -10,7 +10,7 @@ export type TemplateKey =
   | 'shipped'
   | 'ticket_closed'
 
-const DEFAULT_TEMPLATES: Record<
+export const DEFAULT_TEMPLATES: Record<
   TemplateKey,
   { email?: { subject: string; body: string }; whatsapp?: string }
 > = {
