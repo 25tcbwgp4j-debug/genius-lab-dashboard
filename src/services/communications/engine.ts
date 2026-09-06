@@ -101,7 +101,7 @@ export async function sendCommunication(params: SendPayload): Promise<SendCommun
 
   if (shouldSendChannel(preferred, 'email') && emailTo) {
     const resolved = await resolveTemplate(params.templateKey, 'email', params.payload)
-    const rendered = await renderEmailToHtmlAndText(params.templateKey, params.payload, resolved.subject ?? undefined)
+    const rendered = await renderEmailToHtmlAndText(params.templateKey, params.payload, resolved.subject ?? undefined, resolved.body ?? undefined)
     const adapter = getEmailAdapter()
     const result = await sendWithRetry(() => adapter.send({
       to: emailTo,
@@ -121,7 +121,7 @@ export async function sendCommunication(params: SendPayload): Promise<SendCommun
 
   if (!emailSent && !whatsappSent && emailTo && preferred === 'whatsapp') {
     const resolved = await resolveTemplate(params.templateKey, 'email', params.payload)
-    const rendered = await renderEmailToHtmlAndText(params.templateKey, params.payload, resolved.subject ?? undefined)
+    const rendered = await renderEmailToHtmlAndText(params.templateKey, params.payload, resolved.subject ?? undefined, resolved.body ?? undefined)
     const adapter = getEmailAdapter()
     const result = await sendWithRetry(() => adapter.send({
       to: emailTo,

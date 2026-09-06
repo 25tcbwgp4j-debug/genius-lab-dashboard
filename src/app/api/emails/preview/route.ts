@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth-password'
 import { renderEmailToHtmlAndText } from '@/services/communications/email/render-email'
+import { resolveTemplate } from '@/services/communications/template-resolver'
 import type { TemplateKey } from '@/services/communications/template-resolver'
 
 // Auth password-based: check cookie HMAC invece di Supabase Auth
@@ -52,7 +53,10 @@ export async function GET(request: Request) {
   }
   const payload = { ...SAMPLE_PAYLOAD }
   try {
-    const rendered = await renderEmailToHtmlAndText(templateKey, payload)
+    const rendered = await (async () => {
+    const risolto = await resolveTemplate(templateKey, 'email', SAMPLE_PAYLOAD)
+    return renderEmailToHtmlAndText(templateKey, SAMPLE_PAYLOAD, risolto.subject ?? undefined, risolto.body ?? undefined)
+  })()
     return new NextResponse(rendered.html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     })
@@ -77,7 +81,10 @@ export async function POST(request: Request) {
   }
   const payload = { ...SAMPLE_PAYLOAD, ...body.payload }
   try {
-    const rendered = await renderEmailToHtmlAndText(templateKey, payload)
+    const rendered = await (async () => {
+    const risolto = await resolveTemplate(templateKey, 'email', SAMPLE_PAYLOAD)
+    return renderEmailToHtmlAndText(templateKey, SAMPLE_PAYLOAD, risolto.subject ?? undefined, risolto.body ?? undefined)
+  })()
     return new NextResponse(rendered.html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     })

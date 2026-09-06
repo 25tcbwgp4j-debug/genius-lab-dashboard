@@ -114,11 +114,28 @@ export interface RenderedEmail {
 export async function renderEmailToHtmlAndText(
   templateKey: TemplateKey,
   payload: Record<string, string>,
-  subjectOverride?: string | null
+  subjectOverride?: string | null,
+  bodyOverride?: string | null
 ): Promise<RenderedEmail> {
   const Component = getComponent(templateKey)
   const subject = subjectOverride ?? DEFAULT_SUBJECTS[templateKey]
   const subjectResolved = substitute(subject, payload)
+
+  /* Se c'è il testo dei nostri modelli, è QUELLO che va al cliente.
+     Prima il corpo veniva ignorato e partiva un testo generico di libreria
+     («Gentile Mario Rossi, Le confermiamo l'avvenuta registrazione…»): niente
+     firma, niente indirizzo di Viale Somalia e — sul consuntivo — niente
+     coordinate bancarie. Il testo vero sta in template-resolver.ts, letto
+     dalle 2.495 mail realmente inviate. */
+  if (bodyOverride && bodyOverride.trim()) {
+    const testo = substitute(bodyOverride, payload)
+    const html =
+      `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;` +
+      `font-size:14px;line-height:1.55;color:#1a1a1a;white-space:pre-wrap">` +
+      testo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+      `</div>`
+    return { subject: subjectResolved, html, text: testo }
+  }
 
   if (!Component) {
     const body = Object.values(payload).join(' ')
