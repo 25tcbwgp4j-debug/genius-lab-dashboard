@@ -687,46 +687,53 @@ export async function trovaSchedeAction(q: string, stato: string, pagina = 0) {
 }
 
 /**
- * «Trova un preventivo già fatto» — la ricerca come si fa in FileMaker.
+ * «Trova un preventivo già fatto» — la ricerca come la fa Christian in FileMaker.
  *
  * Al banco il preventivo non si inventa: si cerca la scheda di un dispositivo
- * identico e si copia. In FileMaker si entra in Trova e si scrivono tre cose —
- * il modello («pro 13»), l'anno («2020») e il lavoro («logica») — in tre campi
- * diversi, che FileMaker mette in AND.
+ * identico e si copia. In FileMaker si scrive tutto in **una casella sola**,
+ * separando con gli spazi:
  *
- * ⚠️ La ricerca va fatta **parola per parola**, non con la stringa intera:
- * il modello grezzo è scritto «MacBook Pro (13-inch, 2020)», quindi un
- * `ilike '%pro 13%'` non lo trova — la parentesi sta in mezzo. Cercando «pro»
- * e «13» separatamente si passa da 28 risultati a 1.096.
+ *     pro 13" 2020 log
  *
- * ⚠️ Il modello grezzo (`model`) manca su 2.069 preventivi su 6.688, e l'anno
- * del dispositivo sta lì dentro: filtrare per anno taglia via un terzo
- * dell'archivio. Perciò, se con l'anno restano meno di tre preventivi, si
- * riprova senza e lo si dice — meglio un prezzo di un anno vicino che nessuno.
+ * Il modello, l'anno e il lavoro insieme. Ogni parola è un filtro in più (AND),
+ * e ognuna può comparire in un campo diverso: «pro» e «13» nel modello, «2020»
+ * nell'anno del dispositivo, «log» dentro il testo del preventivo.
+ *
+ * ⚠️ Parola per parola, mai la stringa intera: il modello grezzo è scritto
+ * «MacBook Pro (13-inch, 2020)» e la parentesi sta in mezzo, quindi un
+ * `ilike '%pro 13%'` non lo trova — 28 risultati invece di 1.096.
+ *
+ * ⚠️ Le parole si troncano: si cerca `%log%`, così «log» prende LOGICA e
+ * LOGICAL come fa il Trova rapida di FileMaker. È il motivo per cui Christian
+ * può abbreviare.
+ *
+ * ⚠️ L'anno del dispositivo sta solo nel modello grezzo, che manca su 2.069
+ * preventivi su 6.688: se con l'anno non si trova niente si riprova senza, e lo
+ * si dice — meglio un prezzo di un anno vicino che nessun prezzo.
  */
-export async function trovaPreventiviAction(modello: string, anno: string, lavoro: string) {
+export async function trovaPreventiviAction(q: string) {
   const { supabase } = await guard()
-  const pul = (t: string) => t.replace(/[,()*%".]/g, ' ').trim()
-  const parole = pul(modello).split(/\s+/).filter((p) => p.length >= 2).slice(0, 4)
-  const a = anno.replace(/\D/g, '').slice(0, 4)
-  const l = pul(lavoro).slice(0, 40)
-  if (!parole.length && !a && !l) return { rows: [], count: 0, mediana: 0 }
+  const parole = q.replace(/["'\u201d(),.]/g, ' ').trim().split(/\s+/)
+    .filter((t) => t.length >= 2).slice(0, 6)
+  if (!parole.length) return { rows: [], count: 0, mediana: 0 }
+  const anno = parole.find((t) => /^20\d\d$/.test(t))
 
-  const query = (conAnno: boolean) => {
-    let q = supabase
+  const query = (salta?: string) => {
+    let b = supabase
       .from('past_estimates')
       .select('card_no, model, family, fault, body, price, year, month', { count: 'exact' })
-    // il modello sta in `family` (sempre pieno) oppure in `model` (grezzo)
-    for (const p of parole) q = q.or(`family.ilike.%${p}%,model.ilike.%${p}%`)
-    if (conAnno && a) q = q.or(`family.ilike.%${a}%,model.ilike.%${a}%`)
-    if (l) q = q.ilike('body', `%${l}%`)
-    return q.order('year', { ascending: false }).order('month', { ascending: false }).limit(40)
+    for (const t of parole) {
+      if (t === salta) continue
+      const p = t.replace(/[%_]/g, '')
+      b = b.or(`family.ilike.%${p}%,model.ilike.%${p}%,body.ilike.%${p}%,fault.ilike.%${p}%`)
+    }
+    return b.order('year', { ascending: false }).order('month', { ascending: false }).limit(40)
   }
 
-  let { data, count, error } = await query(true)
+  let { data, count, error } = await query()
   let allargato = false
-  if (!error && a && (count ?? 0) < 3) {
-    const r = await query(false)
+  if (!error && anno && (count ?? 0) < 3) {
+    const r = await query(anno)
     if (!r.error && (r.count ?? 0) > (count ?? 0)) {
       data = r.data; count = r.count; allargato = true
     }
@@ -734,6 +741,9 @@ export async function trovaPreventiviAction(modello: string, anno: string, lavor
   if (error) return { rows: [], count: 0, mediana: 0, error: error.message }
 
   const prezzi = (data ?? []).map((z) => Number(z.price)).filter((n) => n > 0).sort((x, y) => x - y)
-  const mediana = prezzi.length ? prezzi[Math.floor(prezzi.length / 2)] : 0
-  return { rows: data ?? [], count: count ?? 0, mediana, allargato }
+  return {
+    rows: data ?? [], count: count ?? 0,
+    mediana: prezzi.length ? prezzi[Math.floor(prezzi.length / 2)] : 0,
+    allargato, anno,
+  }
 }
