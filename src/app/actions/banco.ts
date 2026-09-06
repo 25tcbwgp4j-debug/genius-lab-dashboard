@@ -581,7 +581,10 @@ export async function duplicaSchedaAction(ticketId: string, stessoDispositivo: b
     .single()
   if (eT) return { error: `Scheda non creata: ${eT.message}` }
 
-  revalidatePath('/dashboard/tickets')
+  /* ⛔ niente revalidatePath qui: invalidare la rotta mentre si sta navigando
+     verso una scheda della STESSA rotta faceva aspettare il rerender prima di
+     muoversi — 13 secondi buoni dal clic all'arrivo. L'elenco si ricarica da
+     solo, lo legge una server action a ogni apertura. */
   return { success: true, id: nuova.id, numero: nuova.ticket_number, stessoDispositivo }
 }
 

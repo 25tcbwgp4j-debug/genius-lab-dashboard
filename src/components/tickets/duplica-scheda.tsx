@@ -53,6 +53,12 @@ export function DuplicaScheda({ ticketId, modello }: { ticketId: string; modello
               preventivo e date ripartono da zero.
             </p>
 
+            {pending && (
+              <p className="mt-3 rounded border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                Creo la scheda nuova…
+              </p>
+            )}
+
             <div className="mt-4 grid gap-2">
               <button
                 type="button"

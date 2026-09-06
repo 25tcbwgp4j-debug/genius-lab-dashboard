@@ -81,7 +81,7 @@ export default async function SchedaRiparazione({ params }: { params: Promise<{ 
     supabase.from('operators').select('name').eq('active', true).order('name'),
     supabase.from('price_list').select('id, label, intervention, price, is_shipping').eq('active', true).order('sort_order').order('label'),
     supabase.from('estimate_pairs').select('id, label, first_line, second_line').eq('active', true).order('sort_order'),
-    supabase.from('price_by_device').select('family, intervention, price, jobs, basis'),
+    supabase.from('price_by_device').select('family, intervention, price, jobs, basis'),  // 214 righe: sta in cache
     supabase.from('tickets').select('id').lt('created_at', ticket.created_at).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('tickets').select('id').gt('created_at', ticket.created_at).order('created_at', { ascending: true }).limit(1).maybeSingle(),
     // la posizione nell'archivio, come il «record 3 di 12.785» di FileMaker
