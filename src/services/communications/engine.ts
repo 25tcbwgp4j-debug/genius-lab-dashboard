@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveTemplate, type TemplateKey } from './template-resolver'
 import { getEmailAdapter } from './email/resend-service'
 import { renderEmailToHtmlAndText } from './email/render-email'
+import { allegatoPerMail } from './allegato'
 import { getWhatsAppAdapter } from './whatsapp'
 import { sendWithRetry } from './retry'
 import type { CommunicationChannel } from './types'
@@ -103,12 +104,16 @@ export async function sendCommunication(params: SendPayload): Promise<SendCommun
     const resolved = await resolveTemplate(params.templateKey, 'email', params.payload)
     const rendered = await renderEmailToHtmlAndText(params.templateKey, params.payload, resolved.subject ?? undefined, resolved.body ?? undefined)
     const adapter = getEmailAdapter()
+    const allegati = await allegatoPerMail(
+      params.templateKey, params.ticketId ?? '', params.payload.ticket_number ?? '',
+    )
     const result = await sendWithRetry(() => adapter.send({
       to: emailTo,
       subject: rendered.subject,
       body: rendered.text,
       html: rendered.html,
       text: rendered.text,
+      attachments: allegati,
     }))
     if (result.success) {
       await logCommunication('email', emailTo, rendered.subject, rendered.text, 'sent', result.messageId, null, new Date().toISOString())
@@ -123,12 +128,16 @@ export async function sendCommunication(params: SendPayload): Promise<SendCommun
     const resolved = await resolveTemplate(params.templateKey, 'email', params.payload)
     const rendered = await renderEmailToHtmlAndText(params.templateKey, params.payload, resolved.subject ?? undefined, resolved.body ?? undefined)
     const adapter = getEmailAdapter()
+    const allegati = await allegatoPerMail(
+      params.templateKey, params.ticketId ?? '', params.payload.ticket_number ?? '',
+    )
     const result = await sendWithRetry(() => adapter.send({
       to: emailTo,
       subject: rendered.subject,
       body: rendered.text,
       html: rendered.html,
       text: rendered.text,
+      attachments: allegati,
     }))
     if (result.success) {
       await logCommunication('email', emailTo, rendered.subject, rendered.text, 'sent', result.messageId, null, new Date().toISOString())

@@ -12,7 +12,10 @@ export class ResendEmailService implements IEmailAdapter {
     return this.client
   }
 
-  async send(params: { to: string; subject: string; body: string; html?: string; text?: string }): Promise<SendResult> {
+  async send(params: {
+    to: string; subject: string; body: string; html?: string; text?: string
+    attachments?: { filename: string; content: string }[]
+  }): Promise<SendResult> {
     const resend = this.getClient()
     if (!resend) {
       if (process.env.NODE_ENV !== 'test') {
@@ -31,6 +34,7 @@ export class ResendEmailService implements IEmailAdapter {
         subject: params.subject,
         html,
         text,
+        ...(params.attachments?.length ? { attachments: params.attachments } : {}),
       })
       if (error) return { success: false, error: error.message }
       return { success: true, messageId: data?.id }

@@ -7,7 +7,10 @@ export interface SendResult {
 }
 
 export interface IEmailAdapter {
-  send(params: { to: string; subject: string; body: string; html?: string; text?: string }): Promise<SendResult>
+  send(params: {
+    to: string; subject: string; body: string; html?: string; text?: string
+    attachments?: { filename: string; content: string }[]
+  }): Promise<SendResult>
 }
 
 /** Generic WhatsApp provider abstraction. Implementations: Twilio, Meta Cloud API, stub. */
