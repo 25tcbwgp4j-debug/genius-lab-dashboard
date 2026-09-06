@@ -711,6 +711,9 @@ export async function trovaSchedeAction(q: string, stato: string, pagina = 0) {
  * preventivi su 6.688: se con l'anno non si trova niente si riprova senza, e lo
  * si dice — meglio un prezzo di un anno vicino che nessun prezzo.
  */
+const DISPOSITIVO =
+  /^(macbook|air|pro|mini|studio|imac|iphone|ipad|watch|airpods|ipod|retina|max|plus|se)$|^\d{1,2}$|^20\d\d$/i
+
 export async function trovaPreventiviAction(q: string) {
   const { supabase } = await guard()
   const parole = q.replace(/["'\u201d(),.]/g, ' ').trim().split(/\s+/)
@@ -725,7 +728,13 @@ export async function trovaPreventiviAction(q: string) {
     for (const t of parole) {
       if (t === salta) continue
       const p = t.replace(/[%_]/g, '')
-      b = b.or(`family.ilike.%${p}%,model.ilike.%${p}%,body.ilike.%${p}%,fault.ilike.%${p}%`)
+      /* Le parole che descrivono il DISPOSITIVO si cercano solo nel modello.
+         Altrimenti «pro» becca anche PROBLEMA e PROVA dentro il testo, e in una
+         ricerca sui MacBook Pro spuntano gli Air: su «pro 13" 2020 log» erano
+         25 schede sbagliate su 105. Mirando il modello restano 80, tutte giuste. */
+      b = DISPOSITIVO.test(p)
+        ? b.or(`family.ilike.%${p}%,model.ilike.%${p}%`)
+        : b.or(`family.ilike.%${p}%,model.ilike.%${p}%,body.ilike.%${p}%,fault.ilike.%${p}%`)
     }
     return b.order('year', { ascending: false }).order('month', { ascending: false }).limit(40)
   }
